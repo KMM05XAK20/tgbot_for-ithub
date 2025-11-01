@@ -1,6 +1,7 @@
 from typing import Iterable, Optional
 from sqlalchemy import select, func, and_
 from sqlalchemy.orm import Session
+from sqlalchemy.orm import joinedload
 from ..storage.db import SessionLocal
 from ..storage.models import Task, TaskAssignment, User
 from datetime import datetime, timedelta
@@ -156,3 +157,57 @@ def list_assignments(user_tg_id: int, group: str, page: int = 1, per_page: int =
             .offset((page - 1) * per_page)
         )
         return list(s.execute(stmt).all())
+
+
+def list_pending_submissions(page: int = 1, per_page: int = 10):
+    """
+    Возвращает список pending заявок:
+    (assignment_id, task_title, user_tg_id, username, submitted_at)
+    """
+    with SessionLocal() as s:
+        stmt = (
+            select(
+                TaskAssignment.id,
+                Task.title,
+                User.tg_id,
+                User.username,
+                TaskAssignment.submitted_at,
+            )
+            .join(Task, Task.id == TaskAssignment.task_id)
+            .join(User, User.id == TaskAssignment.user_id)
+            .where(TaskAssignment.status == "submitted")
+            .order_by(TaskAssignment.submitted_at.desc())
+            .limit(per_page)
+            .offset((page - 1) * per_page)
+        )
+        return list(s.execute(stmt).all())
+
+def get_assignment_full(assignment_id: int):
+    """Вернёт assignment + связанные task/user."""
+    with SessionLocal() as s:
+        a = s.query(TaskAssignment)\
+            .options(joinedload(TaskAssignment.task), joinedload(TaskAssignment.user))\
+            .get(assignment_id)
+        return a
+
+def approve_assignment(assignment_id: int) -> bool:
+    with SessionLocal() as s:
+        a = s.get(TaskAssignment, assignment_id)
+        if not a or a.status not in ("submitted", "in_progress"):
+            return False
+        t = s.get(Task, a.task_id)
+        u = s.get(User, a.user_id)
+        a.status = "approved"
+        # начислить монеты
+        u.coins = (u.coins or 0) + (t.reward_coins or 0)
+        s.commit()
+        return True
+
+def reject_assignment(assignment_id: int) -> bool:
+    with SessionLocal() as s:
+        a = s.get(TaskAssignment, assignment_id)
+        if not a or a.status not in ("submitted", "in_progress"):
+            return False
+        a.status = "rejected"
+        s.commit()
+        return True

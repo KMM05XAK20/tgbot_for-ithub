@@ -1,6 +1,33 @@
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
+# admin
+def admin_root_kb() -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    kb.button(text="🕒 На проверке", callback_data="admin:pending:1")
+    kb.button(text="🏠 Меню", callback_data="menu:open:root")
+    kb.adjust(1)
+    return kb.as_markup()
+
+def admin_pending_kb(page: int) -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    prev_cb = f"admin:pending:{max(1, page-1)}"
+    next_cb = f"admin:pending:{page+1}"
+    kb.button(text="⬅️", callback_data=prev_cb)
+    kb.button(text="➡️", callback_data=next_cb)
+    kb.button(text="🏠 Меню", callback_data="menu:open:root")
+    kb.adjust(3)
+    return kb.as_markup()
+
+def admin_assignment_kb(aid: int) -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    kb.button(text="✅ Approve", callback_data=f"admin:approve:{aid}")
+    kb.button(text="❌ Reject", callback_data=f"admin:reject:{aid}")
+    kb.button(text="⬅️ Список", callback_data="admin:pending:1")
+    kb.adjust(2, 1)
+    return kb.as_markup()
+
+# people
 def profile_kb() -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     kb.button(text="📜 История активности", callback_data="profile:history")

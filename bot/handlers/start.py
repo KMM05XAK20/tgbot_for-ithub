@@ -1,6 +1,6 @@
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery
-from aiogram.filters import CommandStart
+from aiogram.filters import CommandStart, Command
 
 from ..keyboards.common import welcome_kb, roles_grid_kb, main_menu_kb
 from ..services.users import get_or_create_user, set_role
@@ -11,6 +11,10 @@ WELCOME_TEXT = (
     "Мы очень рады, что ты решил присоединиться к нашей потрясающей активности!\n\n"
     "Нажми «Начать», чтобы выбрать роль и перейти в меню."
 )
+
+@router.message(Command("whoami"))
+async def whoami(msg: Message):
+    await msg.answer(f"Ваш Telegram ID: <code>{msg.from_user.id}</code>")
 
 @router.message(CommandStart())
 async def on_start(message: Message):

@@ -1,0 +1,12 @@
+# виртуальное окружение
+venv/
+.env
+# базы данных
+bot.db
+# pycache
+__pycache__/
+**/__pycache__/
+# IDE / macOS
+.DS_Store
+.idea/
+.vscode/
