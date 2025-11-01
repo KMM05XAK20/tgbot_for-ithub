@@ -2,12 +2,20 @@ from aiogram import Router, F
 from aiogram.types import CallbackQuery
 from ..services.users import get_user
 from ..keyboards.common import profile_kb, main_menu_kb
+from ..services.tasks import count_assignments_by_status, list_assignments
+from ..keyboards.common import profile_history_filters_kb, profile_history_list_kb
+
+
 
 router = Router()
+
 
 def _role_title(code: str | None) -> str:
     mapping = {"active": "Активный спикер", "guru": "Гуру тех.заданий", "helper": "Помогатор"}
     return mapping.get(code or "", "—")
+
+def _group_title(group: str) -> str:
+    return {"active": "Активные", "submitted": "На проверке", "done": "Завершённые"}.get(group, "Активные")
 
 def _profile_card(username: str | None, role: str | None, coins: int, position: int | None, badges: list[str], created_at) -> str:
     name_line = f"<b>@{username}</b>" if username else "<b>без никнейма</b>"
@@ -24,6 +32,22 @@ def _profile_card(username: str | None, role: str | None, coins: int, position: 
         f"🎖 Бейджи: {badges_line}\n"
         f"📅 С нами с: {created}"
     )
+
+
+@router.callback_query(F.data == "profile:history")
+async def profile_history_root(cb: CallbackQuery):
+    counts = count_assignments_by_status(cb.from_user.id)
+    text = (
+        "📜 <b>История активности</b>\n"
+        "Выберите категорию:\n"
+        "• 🚧 Активные — взятые задания с дедлайном\n"
+        "• 🕒 На проверке — отправлены на модерацию\n"
+        "• ✅ Завершённые — подтверждены/отклонены"
+    )
+    await cb.message.edit_text(text, reply_markup=profile_history_filters_kb(counts))
+    await cb.answer()
+
+
 
 @router.callback_query(F.data == "menu:open:profile")
 async def open_profile(cb: CallbackQuery):

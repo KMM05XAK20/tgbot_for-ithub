@@ -1,9 +1,32 @@
 from aiogram import Router, F
 from aiogram.types import CallbackQuery
+from ...services.tasks import list_tasks, get_task, take_task, has_active_assignment, seed_tasks_if_empty, get_active_assignment
 from ...keyboards.common import tasks_filters_kb, tasks_list_kb, task_view_kb, main_menu_kb
-from ...services.tasks import list_tasks, get_task, take_task, has_active_assignment, seed_tasks_if_empty
 
 router = Router()
+
+
+@router.callback_query(F.data.startswith("tasks:view:"))
+async def view_task(cb: CallbackQuery):
+    task_id = int(cb.data.split(":")[-1])
+    t = get_task(task_id)
+    if not t:
+        await cb.message.edit_text("Задание не найдено.", reply_markup=main_menu_kb())
+        return await cb.answer()
+
+    text = (
+        f"📌 <b>{t.title}</b>\n\n"
+        f"{t.description or 'Без описания'}\n\n"
+        f"Сложность: {_difficulty_title(t.difficulty)}\n"
+        f"Награда: <b>+{t.reward_coins} coins</b>\n"
+        f"Дедлайн: {t.deadline_hours} ч"
+    )
+
+    assignment = get_active_assignment(cb.from_user.id, task_id)
+    already = assignment is not None
+
+    await cb.message.edit_text(text, reply_markup=task_view_kb(t.id, already_taken=already))
+    await cb.answer()
 
 def _difficulty_title(code: str) -> str:
     return {"easy": "🟢 Легкие", "medium": "🟡 Средние", "hard": "🔴 Сложные"}.get(code, "🗂 Все")
@@ -61,3 +84,25 @@ async def take_task_cb(cb: CallbackQuery):
         await cb.answer("Задание добавлено в ваши активные.", show_alert=True)
     else:
         await cb.answer("Не удалось взять задание.", show_alert=True)
+
+@router.callback_query(F.data.startswith("tasks:more:"))
+async def task_more(cb: CallbackQuery):
+    task_id = int(cb.data.split(":")[-1])
+    t = get_task(task_id)
+    if not t:
+        await cb.answer("Задание не найдено.", show_alert=True)
+        return
+
+    text = (
+        f"ℹ️ <b>Подробнее о задании</b>\n\n"
+        f"Название: <b>{t.title}</b>\n"
+        f"Описание: {t.description or '—'}\n"
+        f"Сложность: {_difficulty_title(t.difficulty)}\n"
+        f"Награда: +{t.reward_coins} coins\n"
+        f"Дедлайн: {t.deadline_hours} ч\n"
+        f"Статус: {t.status}"
+    )
+
+    already = has_active_assignment(cb.from_user.id, task_id)
+    await cb.message.edit_text(text, reply_markup=task_view_kb(task_id, already_taken=already))
+    await cb.answer()

@@ -40,6 +40,9 @@ class TaskAssignment(Base):
     submitted_at = Column(DateTime, nullable=True)
     status = Column(String, default="in_progress")  # "in_progress" | "submitted" | "approved" | "rejected"
 
+    submission_text = Column(Text, nullable=True)      # ссылка/описание
+    submission_file_id = Column(String, nullable=True) # file_id фото/видео/док
+
     task = relationship("Task")
     user = relationship("User")
 
