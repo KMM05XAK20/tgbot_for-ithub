@@ -1,0 +1,61 @@
+from aiogram import Router, F
+from aiogram.types import CallbackQuery
+from ..services.users import get_user
+from ..keyboards.common import profile_kb, main_menu_kb
+
+router = Router()
+
+def _role_title(code: str | None) -> str:
+    mapping = {"active": "Активный спикер", "guru": "Гуру тех.заданий", "helper": "Помогатор"}
+    return mapping.get(code or "", "—")
+
+def _profile_card(username: str | None, role: str | None, coins: int, position: int | None, badges: list[str], created_at) -> str:
+    name_line = f"<b>@{username}</b>" if username else "<b>без никнейма</b>"
+    pos_line = f"{position} место" if position is not None else "—"
+    badges_line = " • ".join(badges) if badges else "пока нет"
+    created = created_at.strftime("%Y-%m-%d") if created_at else "—"
+
+    return (
+        "👤 <b>Профиль</b>\n"
+        f"{name_line}\n\n"
+        f"🎭 Роль: <b>{_role_title(role)}</b>\n"
+        f"🪙 Баллы: <b>{coins}</b>\n"
+        f"🏆 Рейтинг: <b>{pos_line}</b>\n"
+        f"🎖 Бейджи: {badges_line}\n"
+        f"📅 С нами с: {created}"
+    )
+
+@router.callback_query(F.data == "menu:open:profile")
+async def open_profile(cb: CallbackQuery):
+    user = get_user(cb.from_user.id)
+    if not user:
+        # На всякий случай — создадим «пустой» профиль
+        text = "Профиль не найден. Нажмите /start ещё раз."
+        await cb.message.edit_text(text, reply_markup=main_menu_kb())
+        return await cb.answer()
+
+    # badges_json в твоей модели может отсутствовать — покажем пусто
+    badges: list[str] = []
+    # если позже добавишь поле badges_json (строка с JSON), распарси тут
+
+    card = _profile_card(
+        username=user.username,
+        role=user.role,
+        coins=user.coins or 0,
+        position=getattr(user, "rating_position", None),
+        badges=badges,
+        created_at=user.created_at,
+    )
+
+    await cb.message.edit_text(card, reply_markup=profile_kb())
+    await cb.answer()
+
+@router.callback_query(F.data == "profile:history")
+async def profile_history(cb: CallbackQuery):
+    # Заглушка: позже подтянем реальные задания из task_assignments
+    text = (
+        "📜 <b>История активности</b>\n"
+        "Пока пусто. Возвращайся после первых заданий 🙂"
+    )
+    await cb.message.edit_text(text + "\n\n⬅️ Вернуться в профиль", reply_markup=profile_kb())
+    await cb.answer()
