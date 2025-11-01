@@ -32,3 +32,34 @@ def main_menu_kb() -> InlineKeyboardMarkup:
     kb.button(text="⚙️ Помощь", callback_data="menu:open:help")
     kb.adjust(2)  # сетка 2xN
     return kb.as_markup()
+
+def tasks_filters_kb() -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    kb.button(text="🟢 Легкие", callback_data="tasks:filter:easy:1")
+    kb.button(text="🟡 Средние", callback_data="tasks:filter:medium:1")
+    kb.button(text="🔴 Сложные", callback_data="tasks:filter:hard:1")
+    kb.button(text="🗂 Все", callback_data="tasks:filter:all:1")
+    kb.adjust(2, 2)
+    return kb.as_markup()
+
+def tasks_list_kb(difficulty: str, page: int, tasks: list[tuple[int, str]]) -> InlineKeyboardMarkup:
+    """tasks: [(id, title), ...]"""
+    kb = InlineKeyboardBuilder()
+    for tid, title in tasks:
+        kb.button(text=f"📌 {title}", callback_data=f"tasks:view:{tid}")
+    # пагинация
+    prev_cb = f"tasks:filter:{difficulty}:{max(1, page-1)}"
+    next_cb = f"tasks:filter:{difficulty}:{page+1}"
+    kb.button(text="⬅️", callback_data=prev_cb)
+    kb.button(text="➡️", callback_data=next_cb)
+    kb.button(text="🏠 Меню", callback_data="menu:open:root")
+    kb.adjust(1, 3, 1)
+    return kb.as_markup()
+
+def task_view_kb(task_id: int) -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    kb.button(text="✅ Взять задание", callback_data=f"tasks:take:{task_id}")
+    kb.button(text="ℹ️ Подробнее", callback_data=f"tasks:more:{task_id}")
+    kb.button(text="⬅️ К списку", callback_data="menu:open:tasks")
+    kb.adjust(1)
+    return kb.as_markup()
