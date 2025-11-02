@@ -2,7 +2,7 @@ from aiogram import Router, F
 from aiogram.types import CallbackQuery
 from ..services.users import get_user
 from ..keyboards.common import profile_kb, main_menu_kb, profile_history_filters_kb, profile_history_list_kb, profile_assignment_kb
-from ..services.tasks import count_assignments_by_status, list_assignments, get_assignment_card
+from ..services.tasks import count_assignments_by_status, list_assignments, get_assignment_card, reward_to_difficulty
 from ..services.levels import level_by_coins, render_progress_bar
 from ..services.badges import render_badges_line
 from ..services.rating import get_user_position
@@ -71,26 +71,36 @@ async def profile_history_root(cb: CallbackQuery):
 # список по группе с пагинацией
 @router.callback_query(F.data.startswith("profile:history:list:"))
 async def profile_history_list(cb: CallbackQuery):
-    _, _, _, group, page_str = cb.data.split(":")
-    page = max(1, int(page_str))
-    rows = list_assignments(cb.from_user.id, group=group, page=page, per_page=10)
+    parts = cb.data.split(":")
+    # варианты:
+    # profile:history:list:<group>:<page>
+    # profile:history:list:<group>:<page>:<diff>
+    group = parts[3]
+    page = max(1, int(parts[4]))
+    diff = parts[5] if len(parts) > 5 else "all"
+
+    rows = list_assignments(cb.from_user.id, group=group, page=page, per_page=10, diff=diff)
 
     group_title = {"active": "Активные", "submitted": "На проверке", "done": "Завершённые"}.get(group, "Активные")
     if not rows:
-        text = f"📜 <b>{group_title}</b>\nПока пусто."
-        await cb.message.edit_text(text, reply_markup=profile_history_list_kb(group, page))
+        text = f"📜 <b>{group_title}</b> · сложность: {diff}\nПока пусто."
+        await cb.message.edit_text(text, reply_markup=profile_history_list_kb(group, page, diff))
         return await cb.answer()
 
-    lines = [f"📜 <b>{group_title}</b> (стр. {page})", ""]
+    def diff_icon(reward: int | None) -> str:
+        m = reward_to_difficulty(reward)
+        return {"easy": "🟢", "medium": "🟡", "hard": "🔴"}.get(m, "•")
+
+    lines = [f"📜 <b>{group_title}</b> · сложность: {diff} (стр. {page})", ""]
     for aid, title, status, reward, due_at, submitted_at in rows:
         when = due_at.strftime("%Y-%m-%d %H:%M") if due_at else (submitted_at.strftime("%Y-%m-%d %H:%M") if submitted_at else "—")
         mark = {"in_progress": "🚧", "submitted": "🕒", "approved": "✅", "rejected": "❌"}.get(status, "•")
-        # текстовая команда на карточку
-        lines.append(f"{mark} <b>{title}</b> — {reward}c — {when} — id:{aid}")
+        dmark = diff_icon(reward)
+        lines.append(f"{mark} {dmark} <b>{title}</b> — {reward}c — {when} — id:{aid}")
     lines.append("")
     lines.append("Открой карточку: отправь <code>my:assign:view:&lt;id&gt;</code>")
 
-    await cb.message.edit_text("\n".join(lines), reply_markup=profile_history_list_kb(group, page), disable_web_page_preview=True)
+    await cb.message.edit_text("\n".join(lines), reply_markup=profile_history_list_kb(group, page, diff), disable_web_page_preview=True)
     await cb.answer()
 
 
@@ -120,11 +130,13 @@ async def _send_assignment_card(target, assignment_id: int, group: str, page: in
 
     when = a["due_at"].strftime("%Y-%m-%d %H:%M") if a["due_at"] else (a["submitted_at"].strftime("%Y-%m-%d %H:%M") if a["submitted_at"] else "—")
     mark = {"in_progress": "🚧", "submitted": "🕒", "approved": "✅", "rejected": "❌"}.get(a["status"], "•")
+    dmark = {"easy":"🟢","medium":"🟡","hard":"🔴"}[reward_to_difficulty(a["reward"])]
     sub = a["submission_text"] or "(нет текста)"
     file_note = "да" if a["has_file"] else "нет"
 
     text = (
         f"📄 <b>Заявка #{a['id']}</b>\n"
+        f"{mark} {dmark} <b>{a['task_title']}</b> — {a['reward']}c\n"
         f"{mark} <b>{a['task_title']}</b> — {a['reward']}c\n"
         f"⏱ Срок/дата: {when}\n"
         f"📥 Текст: {sub}\n"

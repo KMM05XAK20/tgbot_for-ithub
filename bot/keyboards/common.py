@@ -47,15 +47,29 @@ def profile_history_filters_kb(counts: dict[str, int]) -> InlineKeyboardMarkup:
     kb.adjust(1, 1, 1, 1)
     return kb.as_markup()
 
+def profile_history_list_kb(group: str, page: int, diff: str = "all") -> InlineKeyboardMarkup:
+    diff = (diff or "all").lower()
+    def chip(label: str, key: str):
+        # подсветим выбранный
+        mark = "•" if key == diff else ""
+        return f"{label}{' ' + mark if mark else ''}"
 
-def profile_history_list_kb(group: str, page: int) -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
-    kb.button(text="⬅️", callback_data=f"profile:history:list:{group}:{max(1, page-1)}")
-    kb.button(text="➡️", callback_data=f"profile:history:list:{group}:{page+1}")
+    # строка фильтров сложности
+    kb.button(text=chip("Все", "all"),    callback_data=f"profile:history:list:{group}:{page}:all")
+    kb.button(text=chip("🟢", "easy"),    callback_data=f"profile:history:list:{group}:{page}:easy")
+    kb.button(text=chip("🟡", "medium"),  callback_data=f"profile:history:list:{group}:{page}:medium")
+    kb.button(text=chip("🔴", "hard"),    callback_data=f"profile:history:list:{group}:{page}:hard")
+    kb.adjust(4)
+
+    # навигация
+    kb.button(text="⬅️", callback_data=f"profile:history:list:{group}:{max(1, page-1)}:{diff}")
+    kb.button(text="➡️", callback_data=f"profile:history:list:{group}:{page+1}:{diff}")
     kb.button(text="📜 Разделы", callback_data="profile:history")
     kb.button(text="⬅️ Профиль", callback_data="menu:open:profile")
     kb.adjust(2, 2)
     return kb.as_markup()
+
 
 def profile_assignment_kb(aid: int, group: str, page: int) -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()

@@ -230,10 +230,8 @@ def count_assignments_by_status(user_tg_id: int) -> dict[str, int]:
         done = raw.get("approved", 0) + raw.get("rejected", 0)
         return {"active": active, "submitted": submitted, "done": done}
 
-def list_assignments(user_tg_id: int, group: str, page: int = 1, per_page: int = 10):
+def list_assignments(user_tg_id: int, group: str, page: int = 1, per_page: int = 10, diff: str = "all"):
     """
-    Возвращает список заявок для пользователя по группе.
-    group in {"active","submitted","done"}
     -> [(assignment_id, title, status, reward, due_at, submitted_at)]
     """
     with SessionLocal() as s:
@@ -242,11 +240,11 @@ def list_assignments(user_tg_id: int, group: str, page: int = 1, per_page: int =
             return []
 
         if group == "active":
-            cond = TaskAssignment.status == "in_progress"
+            cond_group = TaskAssignment.status == "in_progress"
         elif group == "submitted":
-            cond = TaskAssignment.status == "submitted"
+            cond_group = TaskAssignment.status == "submitted"
         else:
-            cond = or_(TaskAssignment.status == "approved", TaskAssignment.status == "rejected")
+            cond_group = or_(TaskAssignment.status == "approved", TaskAssignment.status == "rejected")
 
         stmt = (
             select(
@@ -259,12 +257,20 @@ def list_assignments(user_tg_id: int, group: str, page: int = 1, per_page: int =
             )
             .join(Task, Task.id == TaskAssignment.task_id)
             .where(TaskAssignment.user_id == u.id)
-            .where(cond)
-            .order_by(TaskAssignment.updated_at.desc().nullslast(), TaskAssignment.id.desc())
-            .limit(per_page)
-            .offset((page - 1) * per_page)
+            .where(cond_group)
+        )
+
+        cond_diff = difficulty_condition(diff)
+        if cond_diff is not None:
+            stmt = stmt.where(cond_diff)
+
+        stmt = (
+            stmt.order_by(TaskAssignment.updated_at.desc().nullslast(), TaskAssignment.id.desc())
+                .limit(per_page)
+                .offset((page - 1) * per_page)
         )
         return list(s.execute(stmt).all())
+
 
 def get_assignment_card(assignment_id: int):
     """
@@ -288,3 +294,30 @@ def get_assignment_card(assignment_id: int):
             "reward": t.reward_coins if t else 0,
             "user_tg_id": u.tg_id if u else None,
         }
+
+def reward_to_difficulty(reward: int | None) -> str:
+    """
+    Маппинг сложности по монетам.
+    🟢 easy:   <=5
+    🟡 medium: 6..10
+    🔴 hard:   >10
+    """
+    r = int(reward or 0)
+    if r <= 5:
+        return "easy"
+    if r <= 10:
+        return "medium"
+    return "hard"
+
+def difficulty_condition(diff: str):
+    """
+    Возвращает SQL-условие по Task.reward_coins для сложностей easy/medium/hard.
+    """
+    diff = (diff or "all").lower()
+    if diff == "easy":
+        return Task.reward_coins <= 5
+    if diff == "medium":
+        return and_(Task.reward_coins >= 6, Task.reward_coins <= 10)
+    if diff == "hard":
+        return Task.reward_coins > 10
+    return None  # all
