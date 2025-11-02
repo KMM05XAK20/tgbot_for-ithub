@@ -1,190 +1,185 @@
-## 🇬🇧 **InfluenceHub Telegram Bot**
+## 🧠 English Version
 
-A Telegram bot for managing influencer activities, gamified tasks, mentoring, and leaderboard inside the **InfluenceHub** ecosystem.
+# INFLUENCE.HUB Telegram Bot
 
----
-
-### ✨ Features
-
-* **Welcome flow** — onboarding and role selection
-* **Main menu** — profile, tasks catalog, ratings, mentoring, calendar, and learning modules
-* **Task system** — dynamic task catalog with difficulty levels, acceptance and submission flow
-* **Profile & Activity history** — coins, rating, badges, and history of completed tasks
-* **Admin panel** — review user submissions, approve/reject tasks, automatically assign coins
-* **AI-based segmentation (future)** — personalized task and content recommendations
+A modular Telegram bot built with **Aiogram 3**, designed for influencer engagement, task tracking, gamification (coins, levels, badges), and mentorship flows.
 
 ---
 
-### 🧩 Tech Stack
+### 🚀 Features
 
-* **Python 3.11+**
-* **[Aiogram 3](https://docs.aiogram.dev/en/latest/)**
-* **SQLAlchemy** for local data storage
-* **Flask** for webhook endpoint (PythonAnywhere-compatible)
-* **dotenv** for configuration management
+* **Welcome & Role Selection** – dynamic start flow with role-based onboarding.
+* **Main Menu** – easy navigation with sections: Profile, Tasks, Rating, Mentorship, Calendar, Courses, Help.
+* **Profile System**
 
----
+  * Shows user’s level, coins, progress bar, badges, rating position.
+  * `/whoime` command – quick profile info shortcut.
+  * History of completed tasks with difficulty filters (🟢 / 🟡 / 🔴).
+* **Task Catalog**
 
-### ⚙️ Installation (Local)
+  * Tasks grouped by difficulty and reward.
+  * Accept, complete, and submit with deadlines and instructions.
+* **Activity History**
 
-```bash
-git clone https://github.com/KMM05XAK20/tgbot_for-ithub.git
-cd tgbot_for-ithub
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-```
+  * Split into Active / Submitted / Done groups.
+  * Pagination and difficulty filter with emoji indicators.
+* **Gamification**
 
-Create a `.env` file in the root:
+  * Level system based on total coins.
+  * Progress bar between levels.
+  * Badges based on milestones.
+* **Admin Panel**
 
-```
-BOT_TOKEN=1234567890:ABCDEF_your_token
-ADMIN_IDS=123456789
-PA_BASE_URL=https://yourname.pythonanywhere.com
-WEBHOOK_SECRET=mysupersecret
-```
+  * Create and publish tasks.
+  * Manage mentors and assign coins.
+  * View influencer activity analytics.
+* **Webhooks ready**
 
-Run locally:
-
-```bash
-python -m bot.main
-```
+  * Supports PythonAnywhere or similar hosting for 24/7 uptime.
 
 ---
 
-### ☁️ Deploy to PythonAnywhere (Webhook)
-
-1. Clone repo and set up virtual environment on PythonAnywhere.
-2. Add environment variables in **Web → Environment Variables**.
-3. Add Flask web app with WSGI pointing to `webapp.py`:
-
-   ```python
-   import sys, os
-   project_home = os.path.expanduser('~/tgbot_for-ithub')
-   if project_home not in sys.path:
-       sys.path.insert(0, project_home)
-   from webapp import app as application
-   ```
-4. Run once:
-
-   ```bash
-   python -m tools.set_webhook
-   ```
-5. Reload the web app — done! Bot runs 24/7.
-
----
-
-### 🧰 Development
-
-* Start polling locally for testing
-* Use feature branches (`feat/...`) for new flows
-* Merge into `main` before deployment
-
----
-
-### 🛠️ Admin Commands
-
-* `/admin` — open admin panel
-* `admin:view:<id>` — view specific submission
-* Approve/reject buttons automatically send user notifications and update coins
-
----
-
-### 📜 License
-
-MIT — open for educational and non-commercial use.
-
----
-
----
-
-## 🇷🇺 **InfluenceHub Telegram Бот**
-
-Телеграм-бот для управления активностями инфлюенсеров, выполнения заданий, менторства и рейтингов в экосистеме **InfluenceHub**.
-
----
-
-### ✨ Возможности
-
-* **Приветственный поток** — onboarding и выбор роли
-* **Главное меню** — профиль, каталог заданий, рейтинг, менторство, календарь, прокачка
-* **Система заданий** — уровни сложности, взятие и сдача заданий
-* **Профиль и история активности** — баллы, место в рейтинге, бейджи
-* **Админ-панель** — проверка и подтверждение заданий, начисление монет
-* **AI-сегментация (план)** — персонализированные задания и контент
-
----
-
-### 🧩 Технологии
+### ⚙️ Tech Stack
 
 * Python 3.11+
-* Aiogram 3
+* Aiogram 3.x
 * SQLAlchemy
-* Flask (вебхуки)
-* python-dotenv
+* SQLite (default)
+* dotenv for environment config
+* Optional: Flask app for webhook deployment
 
 ---
 
-### ⚙️ Установка локально
-
-```bash
-git clone https://github.com/KMM05XAK20/tgbot_for-ithub.git
-cd tgbot_for-ithub
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-```
-
-Создай `.env` в корне проекта:
+### 🧩 Project Structure
 
 ```
-BOT_TOKEN=твой_токен_бота
-ADMIN_IDS=твой_ID
-PA_BASE_URL=https://kmm005.pythonanywhere.com
-WEBHOOK_SECRET=mysupersecret
-```
-
-Запуск:
-
-```bash
-python -m bot.main
+bot/
+├── handlers/           # Main conversation logic
+│   ├── start.py        # Welcome flow
+│   ├── menu.py         # Main menu
+│   ├── profile.py      # Profile, levels, badges
+│   ├── task/           # Catalog and submissions
+│   └── admin/          # Admin panel
+├── services/           # DB + business logic
+│   ├── users.py
+│   ├── tasks.py
+│   ├── levels.py
+│   └── badges.py
+├── storage/            # DB models & connection
+├── keyboards/          # Inline & reply keyboards
+├── states/             # FSM states
+├── middlewares/        # Logging, filters
+└── main.py             # Bot entry point
 ```
 
 ---
 
-### ☁️ Развёртывание на PythonAnywhere
+### 🧰 Commands
 
-1. Склонируй репозиторий.
-2. Создай виртуальное окружение, установи зависимости.
-3. Добавь переменные окружения в разделе **Web → Environment Variables**.
-4. В WSGI-файл впиши:
+| Command   | Description                   |
+| --------- | ----------------------------- |
+| `/start`  | Start or restart bot          |
+| `/whoime` | Show user profile summary     |
+| `/admin`  | Open admin panel (admin only) |
+| `/help`   | FAQ & support info            |
 
-   ```python
-   import sys, os
-   project_home = os.path.expanduser('~/tgbot_for-ithub')
-   if project_home not in sys.path:
-       sys.path.insert(0, project_home)
-   from webapp import app as application
-   ```
-5. Выполни:
+---
+
+### 🧾 Environment (.env)
+
+```
+BOT_TOKEN=123456:ABC-DEF...
+ADMIN_IDS=123456789,987654321
+DATABASE_URL=sqlite:///bot.db
+WEBHOOK_URL=https://your-pythonanywhere-app/webhook/<SECRET>
+```
+
+---
+
+### 💡 Deployment (PythonAnywhere)
+
+1. Clone the repo to `/home/<user>/tgbot_for-ithub/`
+2. Create venv → `python3.10 -m venv venv && source venv/bin/activate`
+3. Install deps → `pip install -r requirements.txt`
+4. Configure `.env` file
+5. Set webhook:
 
    ```bash
    python -m tools.set_webhook
    ```
-6. Нажми **Reload** — бот начнёт работать 24/7.
+6. Add a web app with Flask runner → `webapp.py`
 
 ---
 
-### 🧰 Для разработчиков
+## 🇷🇺 Русская версия
 
-* Запускай локально через polling.
-* Разрабатывай в ветках `feat/...`.
-* Мерджи в `main` перед деплоем.
+# INFLUENCE.HUB — Telegram-бот
+
+Модульный Telegram-бот на **Aiogram 3**, разработанный для вовлечения инфлюенсеров, отслеживания заданий, геймификации и менторства.
 
 ---
 
-### 🛠️ Команды администратора
+### 🚀 Основной функционал
 
-* `/admin` — вход в панель
-* `admin:view:<id>` — открыть заявку
-* Кнопки ✅ / ❌ управляют статусом задания и уведомляют пользователя
+* **Приветствие и выбор роли** — гибкое онбординг-окно для участников.
+* **Главное меню** — быстрый доступ к разделам: Профиль, Задания, Рейтинг, Менторство, Календарь, Курсы, Помощь.
+* **Профиль**
+
+  * Уровни, прогресс-бар, монеты, бейджи и позиция в рейтинге.
+  * Команда `/whoime` — показать профиль в любой момент.
+  * История активности с фильтрами по сложности (🟢 / 🟡 / 🔴).
+* **Каталог заданий**
+
+  * Задания по категориям сложности и награде.
+  * Кнопки «Взять», «Подробнее», «Сдать задание».
+* **История активности**
+
+  * Разделена на: Активные / На проверке / Завершённые.
+  * Поддерживает пагинацию и фильтр сложности.
+* **Геймификация**
+
+  * Система уровней и наград за прогресс.
+  * Автоматические бейджи за достижения.
+* **Админ-панель**
+
+  * Создание заданий, начисление баллов, аналитика.
+* **Веб-хуки**
+
+  * Готов для размещения на PythonAnywhere (работает 24/7).
+
+---
+
+### ⚙️ Технологии
+
+* Python 3.11+
+* Aiogram 3.x
+* SQLAlchemy
+* SQLite
+* dotenv
+* Flask (для вебхуков)
+
+---
+
+### 🧰 Основные команды
+
+| Команда   | Описание                                 |
+| --------- | ---------------------------------------- |
+| `/start`  | Запустить/перезапустить бота             |
+| `/whoime` | Показать профиль                         |
+| `/admin`  | Вход в админ-панель (только для админов) |
+| `/help`   | Помощь и контакты                        |
+
+---
+
+### 💾 Файл окружения (.env)
+
+```
+BOT_TOKEN=123456:ABC-DEF...
+ADMIN_IDS=123456789,987654321
+DATABASE_URL=sqlite:///bot.db
+WEBHOOK_URL=https://your-pythonanywhere-app/webhook/<SECRET>
+```
+
+---
+
+Хочешь, я сразу вставлю этот README.md в проект (заменю старый) и сделаем коммит + пуш в main?
