@@ -3,6 +3,7 @@ from aiogram.types import CallbackQuery
 from ..services.users import get_user
 from ..keyboards.common import profile_kb, main_menu_kb
 from ..services.tasks import count_assignments_by_status, list_assignments
+from ..services.levels import level_by_coins, render_progress_bar
 from ..keyboards.common import profile_history_filters_kb, profile_history_list_kb
 
 
@@ -71,8 +72,28 @@ async def open_profile(cb: CallbackQuery):
         created_at=user.created_at,
     )
 
-    await cb.message.edit_text(card, reply_markup=profile_kb())
-    await cb.answer()
+    li = level_by_coins(user.coins or 0)
+
+    if li.next_base is None:
+        lvl_line = f"🏅 Level: <b>{li.level}</b> (MAX)"
+        progress_line = f"{render_progress_bar(li.progress_percent)} 100%"
+    else:
+        need = li.to_next or 0
+        lvl_line = f"🏅 Level: <b>{li.level}</b> · {user.coins}/{li.next_base} coins"
+        progress_line = f"{render_progress_bar(li.progress_percent)} {li.progress_percent}%  (to next: {need})"
+
+        await cb.message.edit_text(card, reply_markup=profile_kb())
+        await cb.answer()
+
+    position_text = getattr(user, "position", "-")
+
+    text = (
+    f"👤 <b>Твой профиль</b>\n"
+    f"💰 Coins: <b>{user.coins}</b>\n"
+    f"{lvl_line}\n{progress_line}\n"
+    f"📊 Рейтинг: {position_text}\n"
+    # ...
+)
 
 @router.callback_query(F.data == "profile:history")
 async def profile_history(cb: CallbackQuery):

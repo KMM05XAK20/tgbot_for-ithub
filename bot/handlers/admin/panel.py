@@ -4,6 +4,7 @@ from aiogram.filters import Command
 
 from ...filters.roles import IsAdmin
 from ...keyboards.common import admin_root_kb, admin_pending_kb, admin_assignment_kb
+from ...services.levels import level_by_coins
 from ...services.tasks import (
     list_pending_submissions, get_assignment_full,
     approve_assignment, reject_assignment
@@ -77,18 +78,41 @@ async def show_assignment_card(target: Message, assignment_id: int):
 @router.callback_query(F.data.startswith("admin:approve:"), IsAdmin())
 async def admin_approve(cb: CallbackQuery):
     aid = int(cb.data.split(":")[-1])
-    if not approve_assignment(aid):
+
+    # получим данные ДО апрува (для сравнения уровней)
+    a_before = get_assignment_full(aid)
+    if not a_before:
+        await cb.answer("Не найдена заявка.", show_alert=True)
+        return
+    user_before = a_before.user
+    coins_before = user_before.coins or 0
+    lvl_before = level_by_coins(coins_before).level
+
+    if not approve_assignment(aid):  # здесь начисляются coins пользователю
         await cb.answer("Не удалось подтвердить.", show_alert=True)
         return
+
     await cb.answer("Подтверждено, монеты начислены.", show_alert=True)
 
+    # после начисления — перечитываем
+    a_after = get_assignment_full(aid)
+    user_after = a_after.user
+    coins_after = user_after.coins or 0
+    lvl_after = level_by_coins(coins_after).level
+
     # уведомим пользователя
-    a = get_assignment_full(aid)
     try:
+        # базовое уведомление
         await cb.bot.send_message(
-            a.user.tg_id,
-            f"✅ Ваше задание <b>{a.task.title}</b> проверено. Начислено <b>+{a.task.reward_coins}</b> coins!"
+            user_after.tg_id,
+            f"✅ Ваше задание <b>{a_after.task.title}</b> проверено. Начислено <b>+{a_after.task.reward_coins}</b> coins!"
         )
+        # если ап — отдельное сообщение
+        if lvl_after > lvl_before:
+            await cb.bot.send_message(
+                user_after.tg_id,
+                f"🎉 <b>Level up!</b>\nТеперь у вас <b>Level {lvl_after}</b>."
+            )
     except Exception:
         pass
 
