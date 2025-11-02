@@ -1,5 +1,6 @@
 from aiogram import Router, F
 from aiogram.types import CallbackQuery
+from aiogram.exceptions import TelegramBadRequest
 from ..services.users import get_user
 from ..keyboards.common import profile_kb, main_menu_kb, profile_history_filters_kb, profile_history_list_kb, profile_assignment_kb
 from ..services.tasks import count_assignments_by_status, list_assignments, get_assignment_card, reward_to_difficulty
@@ -72,9 +73,6 @@ async def profile_history_root(cb: CallbackQuery):
 @router.callback_query(F.data.startswith("profile:history:list:"))
 async def profile_history_list(cb: CallbackQuery):
     parts = cb.data.split(":")
-    # варианты:
-    # profile:history:list:<group>:<page>
-    # profile:history:list:<group>:<page>:<diff>
     group = parts[3]
     page = max(1, int(parts[4]))
     diff = parts[5] if len(parts) > 5 else "all"
@@ -82,12 +80,15 @@ async def profile_history_list(cb: CallbackQuery):
     rows = list_assignments(cb.from_user.id, group=group, page=page, per_page=10, diff=diff)
 
     group_title = {"active": "Активные", "submitted": "На проверке", "done": "Завершённые"}.get(group, "Активные")
+
     if not rows:
         text = f"📜 <b>{group_title}</b> · сложность: {diff}\nПока пусто."
-        await cb.message.edit_text(text, reply_markup=profile_history_list_kb(group, page, diff))
-        return await cb.answer()
+        kb = profile_history_list_kb(group, page, diff)
+        await _safe_edit(cb.message, text, kb)
+        return await cb.answer("Обновлено")
 
     def diff_icon(reward: int | None) -> str:
+        from ..services.tasks import reward_to_difficulty
         m = reward_to_difficulty(reward)
         return {"easy": "🟢", "medium": "🟡", "hard": "🔴"}.get(m, "•")
 
@@ -100,8 +101,35 @@ async def profile_history_list(cb: CallbackQuery):
     lines.append("")
     lines.append("Открой карточку: отправь <code>my:assign:view:&lt;id&gt;</code>")
 
-    await cb.message.edit_text("\n".join(lines), reply_markup=profile_history_list_kb(group, page, diff), disable_web_page_preview=True)
-    await cb.answer()
+    text = "\n".join(lines)
+    kb = profile_history_list_kb(group, page, diff)
+    await _safe_edit(cb.message, text, kb)
+    await cb.answer("Обновлено")
+
+
+async def _safe_edit(message, text: str, reply_markup=None):
+    """Редактировать без 'message is not modified' ошибок."""
+    # 1) если текст идентичен — пробуем обновить только клавиатуру
+    if (message.text or "") == text:
+        try:
+            await message.edit_reply_markup(reply_markup=reply_markup)
+            return
+        except TelegramBadRequest as e:
+            if "message is not modified" not in str(e):
+                raise
+            return
+    # 2) иначе обновляем и текст, и клавиатуру
+    try:
+        await message.edit_text(text, reply_markup=reply_markup, disable_web_page_preview=True)
+    except TelegramBadRequest as e:
+        if "message is not modified" in str(e):
+            # На всякий случай ещё раз попробуем обновить только клавиатуру
+            try:
+                await message.edit_reply_markup(reply_markup=reply_markup)
+            except TelegramBadRequest:
+                pass
+        else:
+            raise
 
 
 # карточка по текстовой команде
