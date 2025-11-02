@@ -1,0 +1,12 @@
+aiogram==3.4.1
+Flask==3.0.3
+SQLAlchemy==2.0.31
+python-dotenv==1.0.1
+
+# Aiogram v3 опирается на pydantic v2 и magic-filter — фиксируем версии
+pydantic==2.7.1
+pydantic-core==2.18.2
+magic-filter==1.0.12
+
+# На некоторых хостингах aiogram не подтягивает aiohttp сам — закрепим явно
+aiohttp==3.9.5
