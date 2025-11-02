@@ -4,6 +4,7 @@ from ..services.users import get_user
 from ..keyboards.common import profile_kb, main_menu_kb
 from ..services.tasks import count_assignments_by_status, list_assignments
 from ..services.levels import level_by_coins, render_progress_bar
+from ..services.badges import render_badges_line
 from ..keyboards.common import profile_history_filters_kb, profile_history_list_kb
 
 
@@ -85,12 +86,15 @@ async def open_profile(cb: CallbackQuery):
         await cb.message.edit_text(card, reply_markup=profile_kb())
         await cb.answer()
 
+    badges_line = render_badges_line(user.coins or 0)
+
     position_text = getattr(user, "position", "-")
 
     text = (
     f"👤 <b>Твой профиль</b>\n"
     f"💰 Coins: <b>{user.coins}</b>\n"
     f"{lvl_line}\n{progress_line}\n"
+    f"🎖 Бейджи: {badges_line}\n"
     f"📊 Рейтинг: {position_text}\n"
     # ...
 )

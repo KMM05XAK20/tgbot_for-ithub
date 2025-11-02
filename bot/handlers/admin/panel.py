@@ -5,6 +5,7 @@ from aiogram.filters import Command
 from ...filters.roles import IsAdmin
 from ...keyboards.common import admin_root_kb, admin_pending_kb, admin_assignment_kb
 from ...services.levels import level_by_coins
+from ...services.badges import newly_unlocked_badge
 from ...services.tasks import (
     list_pending_submissions, get_assignment_full,
     approve_assignment, reject_assignment
@@ -113,6 +114,13 @@ async def admin_approve(cb: CallbackQuery):
                 user_after.tg_id,
                 f"🎉 <b>Level up!</b>\nТеперь у вас <b>Level {lvl_after}</b>."
             )
+
+            badges = newly_unlocked_badge(lvl_before, lvl_after)
+            if badges:
+                await cb.bot.send_message(
+                    user_after.tg_id,
+                    f"{badges.icon} <b>Badges unlocked:<b> {badges.title}"
+                )
     except Exception:
         pass
 
