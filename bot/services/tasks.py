@@ -126,38 +126,6 @@ def count_assignments_by_status(user_tg_id: int) -> dict[str, int]:
         done = by_status.get("approved", 0) + by_status.get("rejected", 0)
         return {"active": active, "submitted": submitted, "done": done}
 
-def list_assignments(user_tg_id: int, group: str, page: int = 1, per_page: int = 5) -> list[tuple]:
-    """
-    Возвращает список элементов:
-    (assignment_id, task_title, status, due_at, submitted_at)
-    group: 'active' | 'submitted' | 'done'
-    """
-    group_map = {
-        "active": ["in_progress"],
-        "submitted": ["submitted"],
-        "done": ["approved", "rejected"],
-    }
-    statuses = group_map.get(group, ["in_progress"])
-    with SessionLocal() as s:
-        user = _resolve_user(s, user_tg_id)
-        if not user:
-            return []
-        stmt = (
-            select(
-                TaskAssignment.id,
-                Task.title,
-                TaskAssignment.status,
-                TaskAssignment.due_at,
-                TaskAssignment.submitted_at,
-            )
-            .join(Task, Task.id == TaskAssignment.task_id)
-            .where(TaskAssignment.user_id == user.id, TaskAssignment.status.in_(statuses))
-            .order_by(TaskAssignment.id.desc())
-            .limit(per_page)
-            .offset((page - 1) * per_page)
-        )
-        return list(s.execute(stmt).all())
-
 
 def list_pending_submissions(page: int = 1, per_page: int = 10):
     """
@@ -263,13 +231,19 @@ def list_assignments(user_tg_id: int, group: str, page: int = 1, per_page: int =
         cond_diff = difficulty_condition(diff)
         if cond_diff is not None:
             stmt = stmt.where(cond_diff)
-
-        stmt = (
-            stmt.order_by(TaskAssignment.updated_at.desc().nullslast(), TaskAssignment.id.desc())
-                .limit(per_page)
-                .offset((page - 1) * per_page)
-        )
-        return list(s.execute(stmt).all())
+        # ✅ корректная сортировка без updated_at
+        if group == "active":
+            # ближайшие дедлайны сверху; пустые дедлайны — внизу
+            stmt = stmt.order_by(
+                TaskAssignment.due_at.asc().nullslast(),
+                TaskAssignment.id.desc(),
+            )
+        else:
+            # свежеприсланные сверху; если submitted_at пуст — внизу
+            stmt = stmt.order_by(
+                TaskAssignment.submitted_at.desc().nullslast(),
+                TaskAssignment.id.desc(),
+            )
 
 
 def get_assignment_card(assignment_id: int):
