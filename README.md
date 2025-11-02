@@ -178,8 +178,4 @@ BOT_TOKEN=123456:ABC-DEF...
 ADMIN_IDS=123456789,987654321
 DATABASE_URL=sqlite:///bot.db
 WEBHOOK_URL=https://your-pythonanywhere-app/webhook/<SECRET>
-```
-
----
-
-Хочешь, я сразу вставлю этот README.md в проект (заменю старый) и сделаем коммит + пуш в main?
+``
