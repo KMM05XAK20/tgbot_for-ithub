@@ -1,5 +1,5 @@
 from typing import Iterable, Optional
-from sqlalchemy import select, func, and_
+from sqlalchemy import select, func, and_, or_
 from sqlalchemy.orm import Session
 from sqlalchemy.orm import joinedload
 from ..storage.db import SessionLocal
@@ -211,3 +211,80 @@ def reject_assignment(assignment_id: int) -> bool:
         a.status = "rejected"
         s.commit()
         return True
+    
+def count_assignments_by_status(user_tg_id: int) -> dict[str, int]:
+    """
+    Возвращает количество по группам: active/submitted/done
+    active = in_progress; submitted = submitted; done = approved|rejected
+    """
+    with SessionLocal() as s:
+        u = s.execute(select(User).where(User.tg_id == user_tg_id)).scalar_one_or_none()
+        if not u:
+            return {"active": 0, "submitted": 0, "done": 0}
+
+        base = select(TaskAssignment.status, func.count()).where(TaskAssignment.user_id == u.id).group_by(TaskAssignment.status)
+        rows = s.execute(base).all()
+        raw = {st: cnt for st, cnt in rows}
+        active = raw.get("in_progress", 0)
+        submitted = raw.get("submitted", 0)
+        done = raw.get("approved", 0) + raw.get("rejected", 0)
+        return {"active": active, "submitted": submitted, "done": done}
+
+def list_assignments(user_tg_id: int, group: str, page: int = 1, per_page: int = 10):
+    """
+    Возвращает список заявок для пользователя по группе.
+    group in {"active","submitted","done"}
+    -> [(assignment_id, title, status, reward, due_at, submitted_at)]
+    """
+    with SessionLocal() as s:
+        u = s.execute(select(User).where(User.tg_id == user_tg_id)).scalar_one_or_none()
+        if not u:
+            return []
+
+        if group == "active":
+            cond = TaskAssignment.status == "in_progress"
+        elif group == "submitted":
+            cond = TaskAssignment.status == "submitted"
+        else:
+            cond = or_(TaskAssignment.status == "approved", TaskAssignment.status == "rejected")
+
+        stmt = (
+            select(
+                TaskAssignment.id,
+                Task.title,
+                TaskAssignment.status,
+                Task.reward_coins,
+                TaskAssignment.due_at,
+                TaskAssignment.submitted_at,
+            )
+            .join(Task, Task.id == TaskAssignment.task_id)
+            .where(TaskAssignment.user_id == u.id)
+            .where(cond)
+            .order_by(TaskAssignment.updated_at.desc().nullslast(), TaskAssignment.id.desc())
+            .limit(per_page)
+            .offset((page - 1) * per_page)
+        )
+        return list(s.execute(stmt).all())
+
+def get_assignment_card(assignment_id: int):
+    """
+    Полная карточка для просмотра.
+    -> dict | None
+    """
+    with SessionLocal() as s:
+        a = s.get(TaskAssignment, assignment_id)
+        if not a:
+            return None
+        t = s.get(Task, a.task_id)
+        u = s.get(User, a.user_id)
+        return {
+            "id": a.id,
+            "status": a.status,
+            "due_at": a.due_at,
+            "submitted_at": a.submitted_at,
+            "submission_text": a.submission_text,
+            "has_file": bool(a.submission_file_id),
+            "task_title": t.title if t else "—",
+            "reward": t.reward_coins if t else 0,
+            "user_tg_id": u.tg_id if u else None,
+        }

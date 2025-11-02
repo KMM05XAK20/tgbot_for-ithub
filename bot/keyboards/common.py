@@ -36,23 +36,33 @@ def profile_kb() -> InlineKeyboardMarkup:
     return kb.as_markup()
 
 def profile_history_filters_kb(counts: dict[str, int]) -> InlineKeyboardMarkup:
+    a = counts.get("active", 0)
+    s = counts.get("submitted", 0)
+    d = counts.get("done", 0)
     kb = InlineKeyboardBuilder()
-    kb.button(text=f"🚧 Активные ({counts.get('active',0)})", callback_data="profile:history:list:active:1")
-    kb.button(text=f"🕒 На проверке ({counts.get('submitted',0)})", callback_data="profile:history:list:submitted:1")
-    kb.button(text=f"✅ Завершённые ({counts.get('done',0)})", callback_data="profile:history:list:done:1")
-    kb.button(text="⬅️ Назад в профиль", callback_data="menu:open:profile")
-    kb.adjust(1)
+    kb.button(text=f"🚧 Активные ({a})", callback_data="profile:history:list:active:1")
+    kb.button(text=f"🕒 На проверке ({s})", callback_data="profile:history:list:submitted:1")
+    kb.button(text=f"✅ Завершённые ({d})", callback_data="profile:history:list:done:1")
+    kb.button(text="⬅️ Профиль", callback_data="menu:open:profile")
+    kb.adjust(1, 1, 1, 1)
     return kb.as_markup()
+
 
 def profile_history_list_kb(group: str, page: int) -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
-    prev_cb = f"profile:history:list:{group}:{max(1, page-1)}"
-    next_cb = f"profile:history:list:{group}:{page+1}"
-    kb.button(text="⬅️", callback_data=prev_cb)
-    kb.button(text="➡️", callback_data=next_cb)
-    kb.button(text="📂 Разделы", callback_data="profile:history")
-    kb.button(text="🏠 Меню", callback_data="menu:open:root")
-    kb.adjust(3, 1)
+    kb.button(text="⬅️", callback_data=f"profile:history:list:{group}:{max(1, page-1)}")
+    kb.button(text="➡️", callback_data=f"profile:history:list:{group}:{page+1}")
+    kb.button(text="📜 Разделы", callback_data="profile:history")
+    kb.button(text="⬅️ Профиль", callback_data="menu:open:profile")
+    kb.adjust(2, 2)
+    return kb.as_markup()
+
+def profile_assignment_kb(aid: int, group: str, page: int) -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    kb.button(text="⬅️ К списку", callback_data=f"profile:history:list:{group}:{page}")
+    kb.button(text="📜 Разделы", callback_data="profile:history")
+    kb.button(text="⬅️ Профиль", callback_data="menu:open:profile")
+    kb.adjust(1, 2)
     return kb.as_markup()
 
 def welcome_kb() -> InlineKeyboardMarkup:
@@ -113,4 +123,12 @@ def task_view_kb(task_id: int, already_taken: bool) -> InlineKeyboardMarkup:
     kb.button(text="ℹ️ Подробнее", callback_data=f"tasks:more:{task_id}")
     kb.button(text="⬅️ К списку", callback_data="menu:open:tasks")
     kb.adjust(1)
+    return kb.as_markup()
+
+
+def rating_kb():
+    kb = InlineKeyboardBuilder()
+    kb.button(text="🔄 Обновить", callback_data="menu:open:rating")
+    kb.button(text="🏠 Меню", callback_data="menu:open:root")
+    kb.adjust(2)
     return kb.as_markup()
