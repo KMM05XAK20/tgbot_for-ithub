@@ -71,6 +71,15 @@ def profile_history_list_kb(group: str, page: int, diff: str = "all") -> InlineK
     return kb.as_markup()
 
 
+# mentors
+def mentor_topic_kb():
+    kb = InlineKeyboardMarkup(row_width=2)
+    kb.add(InlineKeyboardButton(text="Карьера", callback_data="mentor:topic:career"))
+    kb.add(InlineKeyboardButton(text="Контент", callback_data="mentor:topic:content"))
+    kb.add(InlineKeyboardButton(text="Проекты", callback_data="mentor:topic:projects"))
+    kb.add(InlineKeyboardButton(text="Идеи", callback_data="mentor:topic:ideas"))
+    return kb
+
 def profile_assignment_kb(aid: int, group: str, page: int) -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     kb.button(text="⬅️ К списку", callback_data=f"profile:history:list:{group}:{page}")
