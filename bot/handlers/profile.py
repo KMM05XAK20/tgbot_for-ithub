@@ -88,7 +88,6 @@ async def profile_history_list(cb: CallbackQuery):
         return await cb.answer("Обновлено")
 
     def diff_icon(reward: int | None) -> str:
-        from ..services.tasks import reward_to_difficulty
         m = reward_to_difficulty(reward)
         return {"easy": "🟢", "medium": "🟡", "hard": "🔴"}.get(m, "•")
 
