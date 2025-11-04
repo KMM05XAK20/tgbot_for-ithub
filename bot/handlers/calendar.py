@@ -1,6 +1,7 @@
 from aiogram import Router, F
 from aiogram.types import CallbackQuery, Message
 from aiogram.utils.keyboard import InlineKeyboardButton, InlineKeyboardMarkup
+from aiogram.filters import Command
 from ..services.calendar import get_upcoming_events, get_all_events
 from ..keyboards.common import profile_kb
 
