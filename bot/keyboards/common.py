@@ -72,6 +72,12 @@ def profile_history_list_kb(group: str, page: int, diff: str = "all") -> InlineK
 
 
 # mentors
+def mentor_menu_kb():
+    kb = InlineKeyboardMarkup(row_width=1)
+    kb.add(InlineKeyboardButton(text="Стать ментором", callback_data="mentor:become"))
+    kb.add(InlineKeyboardButton(text="Выбрать наставника", callback_data="mentor:choose"))
+    return kb
+
 def mentor_topic_kb():
     kb = InlineKeyboardMarkup(row_width=2)
     kb.add(InlineKeyboardButton(text="Карьера", callback_data="mentor:topic:career"))
@@ -155,3 +161,10 @@ def rating_kb():
     kb.button(text="🏠 Меню", callback_data="menu:open:root")
     kb.adjust(2)
     return kb.as_markup()
+
+
+def calendar_kb():
+    kb = InlineKeyboardMarkup(row_width=2)
+    kb.add(InlineKeyboardButton(text="Весь календарь", callback_data="calendar:all"))
+    kb.add(InlineKeyboardButton(text="⬅️ Назад", callback_data="menu:open:profile"))
+    return kb

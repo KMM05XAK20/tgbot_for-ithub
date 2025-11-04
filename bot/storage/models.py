@@ -1,9 +1,10 @@
 # bot/storage/models.py
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey
+from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey, Enum
 from sqlalchemy.orm import relationship
-
+from sqlalchemy.ext.declarative import declarative_base
 from .db import Base, engine
+import enum
 
 # --- Users -------------------------------------------------------------------
 class User(Base):
@@ -15,6 +16,27 @@ class User(Base):
     role = Column(String, nullable=True)          # "active" | "guru" | "helper"
     coins = Column(Integer, default=0)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+#--- Mentors ------------------------------------------------------------------
+
+class MentorTopic(enum.Enum):
+    CAREER = "Career"
+    CONTENT = "Content"
+    PROJECTS = "Projects"
+    IDEAS = "Ideas"
+
+class MentorApplication(Base):
+    __tablename__ = 'mentor_applications'
+    
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.id'))
+    mentor_id = Column(Integer, ForeignKey('users.id'))
+    topic = Column(Enum(MentorTopic))
+    created_at = Column(DateTime, default=datetime.utcnow)
+    status = Column(Enum("pending", "accepted", "rejected", name="application_status"), default="pending")
+    
+    user = relationship("User", foreign_keys=[user_id])
+    mentor = relationship("User", foreign_keys=[mentor_id])
 
 # --- Tasks -------------------------------------------------------------------
 class Task(Base):
@@ -45,6 +67,22 @@ class TaskAssignment(Base):
 
     task = relationship("Task")
     user = relationship("User")
+
+# -- Calendar -------------------------------------------------------------------
+class Event(Base):
+    __tablename__ = 'events'
+
+    id = Column(Integer, primary_key=True)
+    title = Column(String, nullable=False)
+    description = Column(String, nullable=True)
+    event_date = Column(DateTime, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
+
+    user = relationship("User", back_populates="events")
+
+User.events = relationship("Event", back_populates="user", lazy='dynamic')
+
 
 # Создаём таблицы ПОСЛЕ объявления всех моделей
 Base.metadata.create_all(bind=engine)

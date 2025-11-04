@@ -1,6 +1,7 @@
-from aiogram import Router, F
+from aiogram import Router, F, types
 from aiogram.types import Message, CallbackQuery
 from aiogram.filters import Command
+from datetime import datetime, timedelta
 
 from ...filters.roles import IsAdmin
 from ...keyboards.common import admin_root_kb, admin_pending_kb, admin_assignment_kb
@@ -10,6 +11,7 @@ from ...services.tasks import (
     list_pending_submissions, get_assignment_full,
     approve_assignment, reject_assignment
 )
+from ...services.calendar import create_event
 
 router = Router()
 
@@ -47,6 +49,16 @@ async def admin_view_by_text(msg: Message):
     except Exception:
         return await msg.answer("Формат: admin:view:<assignment_id>")
     await show_assignment_card(msg, aid)
+
+
+@router.message(Command("create_event"))
+async def create_event_cmd(msg: types.Message):
+    # Пример создания события через команду
+    title = "Пример события"
+    description = "Описание события"
+    event_date = datetime.utcnow() + timedelta(days=2)  # через 2 дня
+    create_event(user_id=msg.from_user.id, title=title, description=description, event_date=event_date)
+    await msg.answer(f"Событие '{title}' успешно создано!")
 
 # Просмотр карточки (если позже сделаешь inline-кнопку admin:view:<id>)
 @router.callback_query(F.data.startswith("admin:view:"), IsAdmin())
