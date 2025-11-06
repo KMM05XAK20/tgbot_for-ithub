@@ -5,17 +5,20 @@ from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 
+from .routers import root_router
 from .config import get_settings
-from .handlers.start import router as start_router
-from .handlers.profile import router as profile_router
-from .handlers.task.catalog import router as task_router
-from .handlers.task.submission import router as submission_router
-from .handlers.admin.panel import router as admin_router
-from .handlers.rating import router as rating_router
-from .handlers.mentorship import router as mentorship_router
-from .handlers.menu import router as menu_router
+# from .handlers.start import router as start_router
+# from .handlers.profile import router as profile_router
+# from .handlers.task.catalog import router as task_router
+# from .handlers.task.submission import router as submission_router
+# from .handlers.admin.panel import router as admin_router
+# from .handlers.rating import router as rating_router
+# from .handlers.mentorship import router as mentorship_router
+# from .handlers.calendar import router as calendar_router
+# from .handlers.menu import router as menu_router
 
-logging.basicConfig(level=logging.INFO)
+
+logging.basicConfig(level=logging.DEBUG)
 
 async def main():
     settings = get_settings()
@@ -26,14 +29,17 @@ async def main():
     )
     dp = Dispatcher()
 
-    dp.include_router(start_router)
-    dp.include_router(profile_router)
-    dp.include_router(task_router)
-    dp.include_router(submission_router)
-    dp.include_router(admin_router)
-    dp.include_router(rating_router)
-    dp.include_router(mentorship_router)
-    dp.include_router(menu_router)
+    dp.include_router(root_router)
+
+    # dp.include_router(start_router)
+    # dp.include_router(profile_router)
+    # dp.include_router(task_router)
+    # dp.include_router(submission_router)
+    # dp.include_router(admin_router)
+    # dp.include_router(rating_router)
+    # dp.include_router(mentorship_router)
+    # dp.include_router(calendar_router)
+    # dp.include_router(menu_router)
 
     if settings.use_webhook:
         print("Webhook mode включен — пропуск опроса.")
