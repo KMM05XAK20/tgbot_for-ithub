@@ -1,4 +1,4 @@
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 # admin
@@ -72,6 +72,15 @@ def profile_history_list_kb(group: str, page: int, diff: str = "all") -> InlineK
 
 
 # mentors
+def mentorship_root_kb() -> InlineKeyboardMarkup:
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="👤 Выбрать наставника", callback_data="mentor:choose")],
+        [InlineKeyboardButton(text="🗂 Мои заявки", callback_data="mentor:myapps")],
+        [InlineKeyboardButton(text="⬅️ В меню", callback_data="menu:open:main")],
+    ])
+    return kb
+
+
 def mentor_menu_kb():
     kb = InlineKeyboardMarkup(row_width=1)
     kb.add(InlineKeyboardButton(text="Стать ментором", callback_data="mentor:become"))
@@ -161,6 +170,14 @@ def rating_kb():
     kb.button(text="🏠 Меню", callback_data="menu:open:root")
     kb.adjust(2)
     return kb.as_markup()
+
+
+def calendar_root_kb() -> InlineKeyboardMarkup:
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="📅 Весь календарь", callback_data="calendar:all")],
+        [InlineKeyboardButton(text="⬅️ В меню", callback_data="menu:open:main")],
+    ])
+    return kb
 
 
 def calendar_kb():
