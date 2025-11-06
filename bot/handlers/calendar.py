@@ -5,6 +5,7 @@ from aiogram.filters import Command
 from ..services.calendar import get_upcoming_events, get_all_events
 from ..keyboards.common import profile_kb
 from ..keyboards.common import calendar_root_kb
+from ..keyboards.common import main_menu_kb
 
 router = Router(name="calendar")
 
@@ -59,3 +60,9 @@ async def show_all_events(cb: CallbackQuery):
     await cb.message.edit_text(text, reply_markup=profile_kb())
     await cb.answer()
 
+
+@router.callback_query(F.data == "menu:open:main")
+async def back_to_main_menu(cb: CallbackQuery):
+    text = "Вы вернулись в главное меню."
+    await cb.message.edit_text(text, reply_markup=main_menu_kb())  # Главное меню
+    await cb.answer()

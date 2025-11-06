@@ -5,6 +5,7 @@ from ..services.users import get_user
 from ..services.mentorship import create_mentor_application, get_mentor_list
 from ..storage.models import MentorTopic  # Добавляем импорт для MentorTopic
 from ..keyboards.common import mentorship_root_kb
+from ..keyboards.common import main_menu_kb
 
 router = Router(name="mentorship")
 
@@ -77,6 +78,11 @@ async def mentor_callback(cb: CallbackQuery):
     create_mentor_application(user_id=user_id, mentor_id=mentor_id, topic=topic)
     await cb.answer("Ваша заявка на менторство отправлена!")
 
+@router.callback_query(F.data == "menu:open:main")
+async def back_to_main_menu(cb: CallbackQuery):
+    text = "Вы вернулись в главное меню."
+    await cb.message.edit_text(text, reply_markup=main_menu_kb())  # Главное меню
+    await cb.answer()
 
 
     print(f"Received callback with data: {cb.data}")  # Для отладки
