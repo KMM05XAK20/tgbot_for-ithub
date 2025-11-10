@@ -1,10 +1,28 @@
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from ..storage.models import MentorTopic
-# admin
 
+
+# welcome zone
+def welcome_kb() -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    kb.button(text="🚀 Начать", callback_data="role:open")
+    return kb.as_markup()
+
+
+# MAIN
+def main_menu_kb() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="👤 Профиль", callback_data="menu:open:profile")],
+        [InlineKeyboardButton(text="📚 Каталог заданий", callback_data="menu:open:tasks")],
+        [InlineKeyboardButton(text="🏆 Рейтинг", callback_data="menu:open:rating")],
+        [InlineKeyboardButton(text="🤝 Менторство", callback_data="menu:open:mentorship")],
+        [InlineKeyboardButton(text="🗓 Календарь", callback_data="menu:open:calendar")],
+        [InlineKeyboardButton(text="⬅️ В начало", callback_data="menu:open:start")],
+    ])
+
+# admin
 def admin_panel_kb() -> InlineKeyboardMarkup:
-    """Главное меню админки."""
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="🧑‍🏫 Менторы", callback_data="admin:mentors")],
         [InlineKeyboardButton(text="📚 Задания", callback_data="admin:tasks")],          # если есть раздел заданий
@@ -82,6 +100,16 @@ def profile_history_list_kb(group: str, page: int, diff: str = "all") -> InlineK
     return kb.as_markup()
 
 
+def profile_assignment_kb(aid: int, group: str, page: int) -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    kb.button(text="⬅️ К списку", callback_data=f"profile:history:list:{group}:{page}")
+    kb.button(text="📜 Разделы", callback_data="profile:history")
+    kb.button(text="⬅️ Профиль", callback_data="menu:open:profile")
+    kb.adjust(1, 2)
+    return kb.as_markup()
+
+
+
 # mentors
 def mentorship_root_kb() -> InlineKeyboardMarkup:
     kb = InlineKeyboardMarkup(inline_keyboard=[
@@ -139,20 +167,7 @@ def mentor_inbox_kb(app_id: int) -> InlineKeyboardMarkup:
         [InlineKeyboardButton(text="⬅️ Назад", callback_data="mentor:inbox")],
     ])
 
-
-def profile_assignment_kb(aid: int, group: str, page: int) -> InlineKeyboardMarkup:
-    kb = InlineKeyboardBuilder()
-    kb.button(text="⬅️ К списку", callback_data=f"profile:history:list:{group}:{page}")
-    kb.button(text="📜 Разделы", callback_data="profile:history")
-    kb.button(text="⬅️ Профиль", callback_data="menu:open:profile")
-    kb.adjust(1, 2)
-    return kb.as_markup()
-
-def welcome_kb() -> InlineKeyboardMarkup:
-    kb = InlineKeyboardBuilder()
-    kb.button(text="🚀 Начать", callback_data="role:open")
-    return kb.as_markup()
-
+# roles
 def roles_grid_kb() -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     kb.button(text="👤 Активный спикер", callback_data="role:choose:active")
@@ -160,55 +175,52 @@ def roles_grid_kb() -> InlineKeyboardMarkup:
     kb.button(text="🏆 Помогатор", callback_data="role:choose:helper")
     kb.adjust(1)  # по одной в столбик; поменяй на 2/3 для сетки
     return kb.as_markup()
-
-def main_menu_kb() -> InlineKeyboardMarkup:
-    kb = InlineKeyboardBuilder()
-    kb.button(text="👤 Мой профиль", callback_data="menu:open:profile")
-    kb.button(text="📚 Каталог заданий", callback_data="menu:open:tasks")
-    kb.button(text="🏆 Рейтинг", callback_data="menu:open:rating")
-    kb.button(text="🤝 Менторство", callback_data="menu:open:mentorship")
-    kb.button(text="🗓️ Календарь", callback_data="menu:open:calendar")
-    kb.button(text="🎯 Прокачка", callback_data="menu:open:courses")
-    kb.button(text="⚙️ Помощь", callback_data="menu:open:help")
-    kb.adjust(2)  # сетка 2xN
-    return kb.as_markup()
-
+# tasks
 def tasks_filters_kb() -> InlineKeyboardMarkup:
-    kb = InlineKeyboardBuilder()
-    kb.button(text="🟢 Легкие", callback_data="tasks:filter:easy:1")
-    kb.button(text="🟡 Средние", callback_data="tasks:filter:medium:1")
-    kb.button(text="🔴 Сложные", callback_data="tasks:filter:hard:1")
-    kb.button(text="🗂 Все", callback_data="tasks:filter:all:1")
-    kb.adjust(2, 2)
-    return kb.as_markup()
-
-def tasks_list_kb(difficulty: str, page: int, tasks: list[tuple[int, str]]) -> InlineKeyboardMarkup:
-    """tasks: [(id, title), ...]"""
-    kb = InlineKeyboardBuilder()
-    for tid, title in tasks:
-        kb.button(text=f"📌 {title}", callback_data=f"tasks:view:{tid}")
-    # пагинация
-    prev_cb = f"tasks:filter:{difficulty}:{max(1, page-1)}"
-    next_cb = f"tasks:filter:{difficulty}:{page+1}"
-    kb.button(text="⬅️", callback_data=prev_cb)
-    kb.button(text="➡️", callback_data=next_cb)
-    kb.button(text="🏠 Меню", callback_data="menu:open:root")
-    kb.adjust(1, 3, 1)
-    return kb.as_markup()
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="🟢 Лёгкие",  callback_data="tasks:filter:easy"),
+            InlineKeyboardButton(text="🟡 Средние", callback_data="tasks:filter:medium"),
+            InlineKeyboardButton(text="🔴 Сложные", callback_data="tasks:filter:hard"),
+            InlineKeyboardButton(text="🗂 Все", callback_data="tasks:filter:all")
+        ],
+        [InlineKeyboardButton(text="⬅️ В меню", callback_data="menu:open:main")],
+    ])
 
 
-def task_view_kb(task_id: int, already_taken: bool) -> InlineKeyboardMarkup:
-    kb = InlineKeyboardBuilder()
-    if already_taken:
-        kb.button(text="📤 Сдать задание", callback_data=f"tasks:submit:{task_id}")
-    else:
-        kb.button(text="✅ Взять задание", callback_data=f"tasks:take:{task_id}")
-    kb.button(text="ℹ️ Подробнее", callback_data=f"tasks:more:{task_id}")
-    kb.button(text="⬅️ К списку", callback_data="menu:open:tasks")
-    kb.adjust(1)
-    return kb.as_markup()
+
+def tasks_list_kb(tasks: list[dict]) -> InlineKeyboardMarkup:
+    rows = []
+    for t in tasks:
+        rows.append([InlineKeyboardButton(text=f"{t['title']} • {t['reward']}💰", callback_data=f"tasks:view:{t['id']}")])
+    rows.append([InlineKeyboardButton(text="⬅️ Фильтры", callback_data="menu:open:tasks")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
+
+def task_details_kb(task_id: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="✅ Взять задание", callback_data=f"tasks:take:{task_id}")],
+        [InlineKeyboardButton(text="📤 Сдать задание", callback_data=f"tasks:sumbit:{task_id}")],
+        [InlineKeyboardButton(text="ℹ️ Подробнее", callback_data=f"tasks:take:{task_id}")]
+        [InlineKeyboardButton(text="⬅️ Назад к каталогу", callback_data="menu:open:tasks")],
+    ])
+
+def task_view_kb(task_id: int) -> InlineKeyboardMarkup:
+    return task_details_kb(task_id)
+
+# def task_view_kb(task_id: int, already_taken: bool) -> InlineKeyboardMarkup:
+#     kb = InlineKeyboardBuilder()
+#     if already_taken:
+#         kb.button(text="📤 Сдать задание", callback_data=f"tasks:submit:{task_id}")
+#     else:
+#         kb.button(text="✅ Взять задание", callback_data=f"tasks:take:{task_id}")
+#     kb.button(text="ℹ️ Подробнее", callback_data=f"tasks:more:{task_id}")
+#     kb.button(text="⬅️ К списку", callback_data="menu:open:tasks")
+#     kb.adjust(1)
+#     return kb.as_markup()
+
+# rating
 def rating_kb():
     kb = InlineKeyboardBuilder()
     kb.button(text="🔄 Обновить", callback_data="menu:open:rating")
@@ -216,14 +228,13 @@ def rating_kb():
     kb.adjust(2)
     return kb.as_markup()
 
-
+# calendar
 def calendar_root_kb() -> InlineKeyboardMarkup:
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="📅 Весь календарь", callback_data="calendar:all")],
         [InlineKeyboardButton(text="⬅️ В меню", callback_data="menu:open:main")],
     ])
     return kb
-
 
 def calendar_kb():
     kb = InlineKeyboardMarkup(row_width=2)
