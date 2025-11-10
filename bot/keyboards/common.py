@@ -2,13 +2,15 @@ from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from ..storage.models import MentorTopic
 # admin
-def admin_root_kb() -> InlineKeyboardMarkup:
-    kb = InlineKeyboardBuilder()
-    kb.button(text="🕒 На проверке", callback_data="admin:pending:1")
-    kb.button(text="🏠 Меню", callback_data="menu:open:root")
-    kb.adjust(1)
-    return kb.as_markup()
 
+def admin_panel_kb() -> InlineKeyboardMarkup:
+    """Главное меню админки."""
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🧑‍🏫 Менторы", callback_data="admin:mentors")],
+        [InlineKeyboardButton(text="📚 Задания", callback_data="admin:tasks")],          # если есть раздел заданий
+        [InlineKeyboardButton(text="📣 Рассылка", callback_data="admin:broadcast")],     # если есть рассылка
+        [InlineKeyboardButton(text="⬅️ В меню", callback_data="menu:open:main")],
+    ])
 def admin_pending_kb(page: int) -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     prev_cb = f"admin:pending:{max(1, page-1)}"

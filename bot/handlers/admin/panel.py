@@ -5,7 +5,7 @@ from aiogram.fsm.context import FSMContext
 from datetime import datetime, timedelta
 
 from ...filters.roles import IsAdmin
-from ...keyboards.common import admin_root_kb, admin_pending_kb, admin_assignment_kb, admin_mentors_root_kb, mentor_role_kb, admin_panel_kb
+from ...keyboards.common import admin_panel_kb, admin_pending_kb, admin_assignment_kb, admin_mentors_root_kb, mentor_role_kb
 from ...services.users import find_user, get_or_create_user, set_user_role
 from ...services.mentorship import get_mentor_list
 from ...states.mentorship import AdminMentorAdd, AdminMentorRemove
@@ -24,7 +24,7 @@ router = Router(name="admin_panel")
 # Вход в админку (команда с фильтром IsAdmin)
 @router.message(Command("admin"), IsAdmin())
 async def admin_entry(msg: Message):
-    await msg.answer("🛠 <b>Админ-панель</b>\nВыберите раздел:", reply_markup=admin_root_kb())
+    await msg.answer("🛠 <b>Админ-панель</b>\nВыберите раздел:", reply_markup=admin_panel_kb())
 
 # Список «на проверке»
 @router.callback_query(F.data.startswith("admin:pending:"), IsAdmin())
