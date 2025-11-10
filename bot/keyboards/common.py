@@ -27,6 +27,15 @@ def admin_assignment_kb(aid: int) -> InlineKeyboardMarkup:
     kb.adjust(2, 1)
     return kb.as_markup()
 
+
+def admin_mentors_root_kb() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="➕ Добавить ментора", callback_data="admin:mentors:add")],
+        [InlineKeyboardButton(text="🗑 Удалить ментора",  callback_data="admin:mentors:remove")],
+        [InlineKeyboardButton(text="📋 Список менторов", callback_data="admin:mentors:list")],
+        [InlineKeyboardButton(text="⬅️ Назад", callback_data="admin:panel")],
+    ])
+
 # people
 def profile_kb() -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
@@ -79,6 +88,14 @@ def mentorship_root_kb() -> InlineKeyboardMarkup:
         [InlineKeyboardButton(text="⬅️ В меню", callback_data="menu:open:main")],
     ])
     return kb
+
+
+def mentor_role_kb(tg_id: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="👤 Гуру",    callback_data=f"admin:mentors:setrole:{tg_id}:guru")],
+        [InlineKeyboardButton(text="🧰 Помогатор", callback_data=f"admin:mentors:setrole:{tg_id}:helper")],
+        [InlineKeyboardButton(text="Отмена", callback_data="admin:mentors")],
+    ])
 
 
 def mentor_menu_kb():

@@ -16,6 +16,30 @@ def get_or_create_user(tg_id: int, username: str | None = None) -> User:
             session.commit()
             session.refresh(user)
         return user
+    
+
+def get_user_by_username(username: str) -> Optional[User]:
+    uname = username.lstrip("@").lower()
+    with SessionLocal() as s:
+        return s.query(User).filter(User.username.ilike(uname)).first()
+
+def get_user_by_tg_id(tg_id: int) -> Optional[User]:
+    with SessionLocal() as s:
+        return s.query(User).filter(User.telegram_id == tg_id).first()
+
+def get_or_create_user(tg_id: int, username: Optional[str] = None) -> User:
+    with SessionLocal() as s:
+        u = s.query(User).filter(User.telegram_id == tg_id).first()
+        if u:
+            if username and (u.username or "").lower() != username.lstrip("@").lower():
+                u.username = username.lstrip("@")
+                s.commit()
+            return u
+        u = User(telegram_id=tg_id, username=(username or "").lstrip("@") or None, role=None, coins=0)
+        s.add(u)
+        s.commit()
+        s.refresh(u)
+        return u
 
 def set_role(tg_id: int, role: str) -> None:
     with SessionLocal() as session:
@@ -23,3 +47,27 @@ def set_role(tg_id: int, role: str) -> None:
         if user:
             user.role = role
             session.commit()
+
+
+
+def set_user_role(tg_id: int, role: Optional[str]) -> Optional[User]:
+    """role: 'guru' | 'helper' | None (снять роль)"""
+    assert role in {"guru", "helper", None}
+    with SessionLocal() as s:
+        u = s.query(User).filter(User.telegram_id == tg_id).first()
+        if not u:
+            return None
+        u.role = role
+        s.commit()
+        s.refresh(u)
+        return u
+
+def find_user(identifier: str) -> Optional[User]:
+    """identifier: '@username' или целое telegram_id (строкой)"""
+    ident = identifier.strip()
+    if ident.startswith("@"):
+        return get_user_by_username(ident)
+    if ident.isdigit():
+        return get_user_by_tg_id(int(ident))
+    # fallback: пробуем как username без @
+    return get_user_by_username(ident)
