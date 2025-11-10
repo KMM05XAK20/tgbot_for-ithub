@@ -2,7 +2,6 @@ from aiogram import Router, F, types
 from aiogram.types import Message, CallbackQuery
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
-from aiogram.fsm.state import StatesGroup, State
 from datetime import datetime, timedelta
 
 from ...filters.roles import IsAdmin
