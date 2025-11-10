@@ -34,7 +34,10 @@ class MentorApplication(Base):
     topic = Column(Enum(MentorTopic))
     created_at = Column(DateTime, default=datetime.utcnow)
     status = Column(Enum("pending", "accepted", "rejected", name="application_status"), default="pending")
-    
+    comment = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    decided_at = Column(DateTime, nullable=True)
+
     user = relationship("User", foreign_keys=[user_id])
     mentor = relationship("User", foreign_keys=[mentor_id])
 

@@ -1,6 +1,6 @@
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-
+from ..storage.models import MentorTopic
 # admin
 def admin_root_kb() -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
@@ -87,13 +87,39 @@ def mentor_menu_kb():
     kb.add(InlineKeyboardButton(text="Выбрать наставника", callback_data="mentor:choose"))
     return kb
 
-def mentor_topic_kb():
-    kb = InlineKeyboardMarkup(row_width=2)
-    kb.add(InlineKeyboardButton(text="Карьера", callback_data="mentor:topic:career"))
-    kb.add(InlineKeyboardButton(text="Контент", callback_data="mentor:topic:content"))
-    kb.add(InlineKeyboardButton(text="Проекты", callback_data="mentor:topic:projects"))
-    kb.add(InlineKeyboardButton(text="Идеи", callback_data="mentor:topic:ideas"))
-    return kb
+def mentor_list_kb(mentors: list) -> InlineKeyboardMarkup:
+    rows = []
+    for m in mentors:
+        title = f"@{m.username}" if m.username else f"ID {m.telegram_id}"
+        rows.append([InlineKeyboardButton(text=title, callback_data=f"mentor:pick:{m.id}")])
+    rows.append([InlineKeyboardButton(text="⬅️ Назад", callback_data="menu:open:mentorship")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def mentor_topics_kb(mentor_id: int) -> InlineKeyboardMarkup:
+    rows = [
+        [InlineKeyboardButton(text="🎯 Карьера", callback_data=f"mentor:topic:{mentor_id}:{MentorTopic.CAREER.value}")],
+        [InlineKeyboardButton(text="📱 Контент", callback_data=f"mentor:topic:{mentor_id}:{MentorTopic.CONTENT.value}")],
+        [InlineKeyboardButton(text="🔧 Проекты", callback_data=f"mentor:topic:{mentor_id}:{MentorTopic.PROJECTS.value}")],
+        [InlineKeyboardButton(text="💡 Идеи",   callback_data=f"mentor:topic:{mentor_id}:{MentorTopic.IDEAS.value}")],
+        [InlineKeyboardButton(text="⬅️ Назад", callback_data="mentor:choose")],
+    ]
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def mentor_confirm_kb(mentor_id: int, topic: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="✅ Отправить заявку", callback_data=f"mentor:confirm:{mentor_id}:{topic}")],
+        [InlineKeyboardButton(text="⬅️ Назад", callback_data=f"mentor:topic_back:{mentor_id}")],
+    ])
+
+def mentor_inbox_kb(app_id: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="✅ Принять", callback_data=f"mentor:app:{app_id}:approve")],
+        [InlineKeyboardButton(text="❌ Отклонить", callback_data=f"mentor:app:{app_id}:reject")],
+        [InlineKeyboardButton(text="⬅️ Назад", callback_data="mentor:inbox")],
+    ])
+
 
 def profile_assignment_kb(aid: int, group: str, page: int) -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
