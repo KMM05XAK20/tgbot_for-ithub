@@ -109,7 +109,7 @@ def mentor_menu_kb():
 def mentor_list_kb(mentors: list) -> InlineKeyboardMarkup:
     rows = []
     for m in mentors:
-        title = f"@{m.username}" if m.username else f"ID {m.telegram_id}"
+        title = f"@{m.username}" if m.username else f"ID {m.tg_id}"
         rows.append([InlineKeyboardButton(text=title, callback_data=f"mentor:pick:{m.id}")])
     rows.append([InlineKeyboardButton(text="⬅️ Назад", callback_data="menu:open:mentorship")])
     return InlineKeyboardMarkup(inline_keyboard=rows)

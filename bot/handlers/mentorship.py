@@ -55,7 +55,7 @@ async def pick_mentor(cb: CallbackQuery):
     if not mentor:
         await cb.answer("Наставник не найден")
         return
-    name = f"@{mentor.username}" if mentor.username else f"ID {mentor.telegram_id}"
+    name = f"@{mentor.username}" if mentor.username else f"ID {mentor.tg_id}"
     await cb.message.edit_text(
         f"Наставник: <b>{name}</b>\nВыбери тему:",
         reply_markup=mentor_topics_kb(mentor_id),
@@ -102,10 +102,10 @@ async def confirm_application(cb: CallbackQuery):
         await cb.message.edit_text("Заявка отправлена ✅\nСтатус: pending", reply_markup=mentorship_root_kb())
         # уведомим ментора (если есть его tg id)
         mentor = get_user(mentor_id)
-        if mentor and mentor.telegram_id:
+        if mentor and mentor.tg_id:
             try:
                 await cb.bot.send_message(
-                    mentor.telegram_id,
+                    mentor.tg_id,
                     f"🆕 Новая заявка на менторство от @{cb.from_user.username or cb.from_user.id}\n"
                     f"Тема: <b>{topic_enum.name}</b>",
                     parse_mode=ParseMode.HTML
@@ -169,10 +169,10 @@ async def app_decision(cb: CallbackQuery):
         return
     # уведомим пользователя
     usr = get_user(updated.user_id)
-    if usr and usr.telegram_id:
+    if usr and usr.tg_id:
         try:
             await cb.bot.send_message(
-                usr.telegram_id,
+                usr.tg_id,
                 f"📢 Ваша заявка #{updated.id} { 'принята ✅' if updated.status=='approved' else 'отклонена ❌' }"
             )
         except Exception:

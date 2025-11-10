@@ -7,17 +7,6 @@ def get_user(tg_id: int) -> Optional[User]:
     with SessionLocal() as session:
         return session.query(User).filter_by(tg_id=tg_id).first()
 
-def get_or_create_user(tg_id: int, username: str | None = None) -> User:
-    with SessionLocal() as session:
-        user = session.query(User).filter_by(tg_id=tg_id).first()
-        if not user:
-            user = User(tg_id=tg_id, username=username)
-            session.add(user)
-            session.commit()
-            session.refresh(user)
-        return user
-    
-
 def get_user_by_username(username: str) -> Optional[User]:
     uname = username.lstrip("@").lower()
     with SessionLocal() as s:
@@ -25,17 +14,17 @@ def get_user_by_username(username: str) -> Optional[User]:
 
 def get_user_by_tg_id(tg_id: int) -> Optional[User]:
     with SessionLocal() as s:
-        return s.query(User).filter(User.telegram_id == tg_id).first()
+        return s.query(User).filter(User.tg_id == tg_id).first()
 
 def get_or_create_user(tg_id: int, username: Optional[str] = None) -> User:
     with SessionLocal() as s:
-        u = s.query(User).filter(User.telegram_id == tg_id).first()
+        u = s.query(User).filter(User.tg_id == tg_id).first()
         if u:
             if username and (u.username or "").lower() != username.lstrip("@").lower():
                 u.username = username.lstrip("@")
                 s.commit()
             return u
-        u = User(telegram_id=tg_id, username=(username or "").lstrip("@") or None, role=None, coins=0)
+        u = User(tg_id=tg_id, username=(username or "").lstrip("@") or None, role=None, coins=0)
         s.add(u)
         s.commit()
         s.refresh(u)
@@ -54,7 +43,7 @@ def set_user_role(tg_id: int, role: Optional[str]) -> Optional[User]:
     """role: 'guru' | 'helper' | None (снять роль)"""
     assert role in {"guru", "helper", None}
     with SessionLocal() as s:
-        u = s.query(User).filter(User.telegram_id == tg_id).first()
+        u = s.query(User).filter(User.tg_id == tg_id).first()
         if not u:
             return None
         u.role = role
@@ -63,7 +52,7 @@ def set_user_role(tg_id: int, role: Optional[str]) -> Optional[User]:
         return u
 
 def find_user(identifier: str) -> Optional[User]:
-    """identifier: '@username' или целое telegram_id (строкой)"""
+    """identifier: '@username' или целое tg_id (строкой)"""
     ident = identifier.strip()
     if ident.startswith("@"):
         return get_user_by_username(ident)

@@ -179,7 +179,7 @@ async def admin_panel_home(cb: CallbackQuery):
 @router.callback_query(IsAdmin(), F.data == "admin:mentors:add")
 async def mentor_add_start(cb: CallbackQuery, state: FSMContext):
     await state.set_state(AdminMentorAdd.waiting_identifier)
-    await cb.message.edit_text("Отправь @username или telegram_id пользователя, которого сделать ментором.")
+    await cb.message.edit_text("Отправь @username или tg_id пользователя, которого сделать ментором.")
     await cb.answer()
 
 # ➕ Добавить ментора — шаг 2: принять идентификатор и спросить роль
@@ -192,11 +192,11 @@ async def mentor_add_got_identifier(msg: Message, state: FSMContext):
         if ident.isdigit():
             u = get_or_create_user(int(ident))
         else:
-            await msg.answer("Не нашёл пользователя. Пришли @username или цифровой telegram_id.")
+            await msg.answer("Не нашёл пользователя. Пришли @username или цифровой tg_id.")
             return
-    await state.update_data(tg_id=u.telegram_id)
-    await msg.answer(f"Найден пользователь: @{u.username or '—'} (id={u.telegram_id}). Выбери роль:",
-                     reply_markup=mentor_role_kb(u.telegram_id))
+    await state.update_data(tg_id=u.tg_id)
+    await msg.answer(f"Найден пользователь: @{u.username or '—'} (id={u.tg_id}). Выбери роль:",
+                     reply_markup=mentor_role_kb(u.tg_id))
 
 
 # обработчик кнопок выбора роли
@@ -216,7 +216,7 @@ async def mentor_set_role(cb: CallbackQuery, state: FSMContext):
 @router.callback_query(IsAdmin(), F.data == "admin:mentors:remove")
 async def mentor_remove_start(cb: CallbackQuery, state: FSMContext):
     await state.set_state(AdminMentorRemove.waiting_identifier)
-    await cb.message.edit_text("Отправь @username или telegram_id, чтобы снять роль ментора.")
+    await cb.message.edit_text("Отправь @username или tg_id, чтобы снять роль ментора.")
     await cb.answer()
 
 
@@ -229,9 +229,9 @@ async def mentor_remove_got_identifier(msg: Message, state: FSMContext):
     if not u:
         await msg.answer("Не нашёл пользователя.")
         return
-    set_user_role(u.telegram_id, None)
+    set_user_role(u.tg_id, None)
     await state.clear()
-    await msg.answer(f"✅ Роль ментора снята: @{u.username or '—'} (id={u.telegram_id})",
+    await msg.answer(f"✅ Роль ментора снята: @{u.username or '—'} (id={u.tg_id})",
                      reply_markup=admin_mentors_root_kb())
 
 # 📋 Список менторов
@@ -243,7 +243,7 @@ async def mentor_list_view(cb: CallbackQuery):
         return await cb.answer()
     lines = []
     for m in mentors:
-        title = f"@{m.username}" if m.username else f"id={m.telegram_id}"
+        title = f"@{m.username}" if m.username else f"id={m.tg_id}"
         lines.append(f"• {title} — {m.role}")
     await cb.message.edit_text("📋 Список менторов:\n\n" + "\n".join(lines), reply_markup=admin_mentors_root_kb())
     await cb.answer()
