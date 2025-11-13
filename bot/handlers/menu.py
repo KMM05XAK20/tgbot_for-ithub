@@ -1,8 +1,9 @@
 from aiogram import Router, F
 from aiogram.types import CallbackQuery
+from aiogram.filters import Command
 from ..keyboards.common import main_menu_kb
 
-router = Router()
+router = Router(name="menu")
 
 SECTION_TEXTS = {
     "profile": "👤 Профиль\nТвои баллы: {coins} coins\nТвой рейтинг: {position} место\n(Данные появятся после подключения БД)",

@@ -1,31 +1,25 @@
 from aiogram import Router, F
 from aiogram.types import CallbackQuery
-from ...services.tasks import list_tasks, get_task, take_task, has_active_assignment, seed_tasks_if_empty, get_active_assignment
-from ...keyboards.common import tasks_filters_kb, tasks_list_kb, task_view_kb, main_menu_kb
+from aiogram.enums import ParseMode
+from ...services.tasks import list_tasks, get_task, take_task,  has_active_assignment, seed_tasks_if_empty, get_active_assignment
+from ...keyboards.common import tasks_filters_kb, tasks_list_kb, task_details_kb, main_menu_kb
 
-router = Router()
-
+router = Router(name="tasks_catalog")
 
 @router.callback_query(F.data.startswith("tasks:view:"))
 async def view_task(cb: CallbackQuery):
-    task_id = int(cb.data.split(":")[-1])
+    task_id = int(cb.data.split(":")[2])
     t = get_task(task_id)
     if not t:
-        await cb.message.edit_text("Задание не найдено.", reply_markup=main_menu_kb())
-        return await cb.answer()
-
+        await cb.answer("Задание не найдено")
+        return
     text = (
-        f"📌 <b>{t.title}</b>\n\n"
-        f"{t.description or 'Без описания'}\n\n"
-        f"Сложность: {_difficulty_title(t.difficulty)}\n"
-        f"Награда: <b>+{t.reward_coins} coins</b>\n"
-        f"Дедлайн: {t.deadline_hours} ч"
+        f"📱 <b>{t['title']}</b>\n"
+        f"💰 Награда: {t['reward']} coins\n"
+        f"⏱ Дедлайн: {t.get('deadline_text','—')}\n\n"
+        f"{t.get('description','Без описания')}"
     )
-
-    assignment = get_active_assignment(cb.from_user.id, task_id)
-    already = assignment is not None
-
-    await cb.message.edit_text(text, reply_markup=task_view_kb(t.id, already_taken=already))
+    await cb.message.edit_text(text, reply_markup=task_details_kb(task_id), parse_mode=ParseMode.HTML)
     await cb.answer()
 
 def _difficulty_title(code: str) -> str:
@@ -39,52 +33,58 @@ async def open_tasks_root(cb: CallbackQuery):
     await cb.message.edit_text(text, reply_markup=tasks_filters_kb())
     await cb.answer()
 
-@router.callback_query(F.data.startswith("tasks:filter:"))
-async def open_tasks_list(cb: CallbackQuery):
-    # data: tasks:filter:<difficulty|all>:<page>
-    _, _, diff, page_str = cb.data.split(":")
-    page = int(page_str)
-    diff_arg = None if diff == "all" else diff
-    tasks = list_tasks(diff_arg, page=page, per_page=5)
-    items = [(t.id, f"{t.title} · +{t.reward_coins}c") for t in tasks]
-
-    header = f"Каталог → {_difficulty_title(diff)} (стр. {page})"
-    body = "Выберите задание:"
-    text = f"📚 <b>{header}</b>\n{body}"
-
-    await cb.message.edit_text(text, reply_markup=tasks_list_kb(diff, page, items))
-    await cb.answer()
-
-@router.callback_query(F.data.startswith("tasks:view:"))
-async def view_task(cb: CallbackQuery):
-    task_id = int(cb.data.split(":")[-1])
-    t = get_task(task_id)
-    if not t:
-        await cb.message.edit_text("Задание не найдено.", reply_markup=main_menu_kb())
-        return await cb.answer()
-
+@router.callback_query(F.data == "menu:open:tasks")
+async def open_tasks_root(cb: CallbackQuery):
+    # на всякий случай — если в базе нет заданий, подсеять примеры
+    seed_tasks_if_empty()
     text = (
-        f"📌 <b>{t.title}</b>\n\n"
-        f"{t.description or 'Без описания'}\n\n"
-        f"Сложность: {_difficulty_title(t.difficulty)}\n"
-        f"Награда: <b>+{t.reward_coins} coins</b>\n"
-        f"Дедлайн: {t.deadline_hours} ч"
+        "📚 <b>Каталог заданий</b>\n"
+        "Выбери уровень сложности, чтобы посмотреть задания.\n\n"
+        "• 🟢 Лёгкие (1–5 coins)\n"
+        "• 🟡 Средние (5–10 coins)\n"
+        "• 🔴 Сложные (10–15 coins)\n"
     )
-    await cb.message.edit_text(text, reply_markup=task_view_kb(t.id))
+    await cb.message.edit_text(text, reply_markup=tasks_filters_kb(), parse_mode=ParseMode.HTML)
     await cb.answer()
+# fake-copy function
+# @router.callback_query(F.data.startswith("tasks:view:"))
+# async def view_task(cb: CallbackQuery):
+#     task_id = int(cb.data.split(":")[-1])
+#     t = get_task(task_id)
+#     if not t:
+#         await cb.message.edit_text("Задание не найдено.", reply_markup=main_menu_kb())
+#         return await cb.answer()
+
+#     text = (
+#         f"📌 <b>{t.title}</b>\n\n"
+#         f"{t.description or 'Без описания'}\n\n"
+#         f"Сложность: {_difficulty_title(t.difficulty)}\n"
+#         f"Награда: <b>+{t.reward_coins} coins</b>\n"
+#         f"Дедлайн: {t.deadline_hours} ч"
+#     )
+#     await cb.message.edit_text(text, reply_markup=task_details_kb(t.id))
+#     await cb.answer()
+
 
 @router.callback_query(F.data.startswith("tasks:take:"))
 async def take_task_cb(cb: CallbackQuery):
-    task_id = int(cb.data.split(":")[-1])
-    if has_active_assignment(cb.from_user.id, task_id):
-        await cb.answer("У тебя уже есть это задание в работе.", show_alert=True)
-        return
-    ok = take_task(cb.from_user.id, task_id)
-    if ok:
-        await cb.answer("Задание добавлено в ваши активные.", show_alert=True)
-    else:
-        await cb.answer("Не удалось взять задание.", show_alert=True)
+    task_id = int(cb.data.split(":")[2])
 
+    # Запрет брать новое, если есть активное (если у тебя есть такая логика)
+    if has_active_assignment(cb.from_user.id):
+        await cb.answer("У тебя уже есть активное задание. Заверши его прежде чем брать новое.", show_alert=True)
+        return
+
+    ok = take_task(user_tg_id=cb.from_user.id, task_id=task_id)
+    if not ok:
+        await cb.answer("Не удалось взять задание. Возможно, его уже взяли.", show_alert=True)
+        return
+
+    await cb.message.edit_text(
+        "✅ Задание взято!\nИнструкции отправлены в личные сообщения (или смотри раздел «Активные» в профиле).",
+        reply_markup=main_menu_kb()
+    )
+    await cb.answer()
 @router.callback_query(F.data.startswith("tasks:more:"))
 async def task_more(cb: CallbackQuery):
     task_id = int(cb.data.split(":")[-1])
@@ -104,5 +104,5 @@ async def task_more(cb: CallbackQuery):
     )
 
     already = has_active_assignment(cb.from_user.id, task_id)
-    await cb.message.edit_text(text, reply_markup=task_view_kb(task_id, already_taken=already))
+    await cb.message.edit_text(text, reply_markup=task_details_kb(task_id, already_taken=already))
     await cb.answer()

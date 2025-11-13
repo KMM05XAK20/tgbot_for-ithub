@@ -39,6 +39,7 @@ def admin_pending_kb(page: int) -> InlineKeyboardMarkup:
     kb.adjust(3)
     return kb.as_markup()
 
+# approve/reject --> task
 def admin_assignment_kb(aid: int) -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     kb.button(text="✅ Approve", callback_data=f"admin:approve:{aid}")
@@ -47,7 +48,7 @@ def admin_assignment_kb(aid: int) -> InlineKeyboardMarkup:
     kb.adjust(2, 1)
     return kb.as_markup()
 
-
+# admin menu for mentors
 def admin_mentors_root_kb() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="➕ Добавить ментора", callback_data="admin:mentors:add")],
@@ -55,6 +56,49 @@ def admin_mentors_root_kb() -> InlineKeyboardMarkup:
         [InlineKeyboardButton(text="📋 Список менторов", callback_data="admin:mentors:list")],
         [InlineKeyboardButton(text="⬅️ Назад", callback_data="admin:panel")],
     ])
+
+# administration tasks
+def admin_tasks_root_kb() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="➕ Добавить задание", callback_data="admin:tasks:add")],
+        [InlineKeyboardButton(text="📋 Список заданий", callback_data="admin:tasks:list")],
+        [InlineKeyboardButton(text="🌱 Засеять демо", callback_data="admin:tasks:seed")],
+        [InlineKeyboardButton(text="⬅️ Назад", callback_data="admin:panel")],
+    ])
+
+def admin_review_root_kb() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🕒 На проверке", callback_data="admin:review:pending")],
+        [InlineKeyboardButton(text="⬅️ Назад", callback_data="admin:panel")],
+    ])
+
+def admin_review_item_kb() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="✅ Принять", callback_data=f"admin:review:{assignment_id}:approve")],
+        [InlineKeyboardButton(text="❌ Отклонить", callback_data=f"admin:review:{assignment_id}:reject")],
+        [InlineKeyboardButton(text="⬅️ Назад", callback_data="admin:review:pending")],
+    ])
+
+def admin_tasks_list_kb(tasks: list) -> InlineKeyboardMarkup:
+    rows = []
+    for t in tasks:
+        tid = getattr(t, "id", None)
+        title = getattr(t, "title", getattr(t, "name", f"task #{tid}"))
+        reward = getattr(t, "reward", getattr(t, "coins", None))
+        pub = getattr(t, "published", getattr(t, "is_published", False))
+
+        # строка с названием
+        label = f"{title}" + (f" • {reward}💰" if reward is not None else "")
+        rows.append([InlineKeyboardButton(text=label, callback_data=f"admin:tasks:nop:{tid}")])
+
+        # строка с действиями
+        rows.append([
+            InlineKeyboardButton(text=("🔓 Опубл." if pub else "🔒 Скрыто"), callback_data=f"admin:tasks:toggle:{tid}"),
+            InlineKeyboardButton(text="🗑 Удалить", callback_data=f"admin:tasks:delete:{tid}"),
+        ])
+    rows.append([InlineKeyboardButton(text="⬅️ Назад", callback_data="admin:tasks")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
 
 # people
 def profile_kb() -> InlineKeyboardMarkup:
@@ -189,25 +233,45 @@ def tasks_filters_kb() -> InlineKeyboardMarkup:
 
 
 
-def tasks_list_kb(tasks: list[dict]) -> InlineKeyboardMarkup:
+def tasks_list_kb(tasks: list) -> InlineKeyboardMarkup:
     rows = []
     for t in tasks:
-        rows.append([InlineKeyboardButton(text=f"{t['title']} • {t['reward']}💰", callback_data=f"tasks:view:{t['id']}")])
+        title = getattr(t, "title", getattr(t, "name", "Untitled"))
+        reward = getattr(t, "reward", getattr(t, "coins", "—"))
+        tid = getattr(t, "id", None)
+        rows.append([InlineKeyboardButton(text=f"{title} • {reward}💰", callback_data=f"tasks:view:{tid}")])
     rows.append([InlineKeyboardButton(text="⬅️ Фильтры", callback_data="menu:open:tasks")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
-
+def task_submit_kb(task_id: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="📤 Сдать задание", callback_data=f"tasks:submit:{task_id}")],
+        [InlineKeyboardButton(text="⬅️ Назад к каталогу", callback_data="menu:open:tasks")],
+    ])
 
 def task_details_kb(task_id: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="✅ Взять задание", callback_data=f"tasks:take:{task_id}")],
-        [InlineKeyboardButton(text="📤 Сдать задание", callback_data=f"tasks:sumbit:{task_id}")],
-        [InlineKeyboardButton(text="ℹ️ Подробнее", callback_data=f"tasks:take:{task_id}")]
+        [InlineKeyboardButton(text="📤 Сдать задание", callback_data=f"tasks:submit:{task_id}")],
+        [InlineKeyboardButton(text="ℹ️ Подробнее", callback_data=f"tasks:take:{task_id}")],
         [InlineKeyboardButton(text="⬅️ Назад к каталогу", callback_data="menu:open:tasks")],
     ])
 
-def task_view_kb(task_id: int) -> InlineKeyboardMarkup:
-    return task_details_kb(task_id)
+# # alias
+# def task_view_kb(task_id: int) -> InlineKeyboardMarkup:
+#     return task_details_kb(task_id)
+
+def task_view_kb(task_id: int, alredy_taken: bool = True) -> InlineKeyboardMarkup:
+    rows = []
+    if alredy_taken:
+        rows.append([InlineKeyboardButton(text="📤 Сдать задание", callback_data=f"tasks:submit:{task_id}")])
+    else:
+        rows.append([InlineKeyboardButton(text="✅ Взять задание", callback_data=f"tasks:take:{task_id}")])
+    
+    rows.append([InlineKeyboardButton(text="⬅️ К списку", callback_data="menu:open:tasks")])
+
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
 
 # def task_view_kb(task_id: int, already_taken: bool) -> InlineKeyboardMarkup:
 #     kb = InlineKeyboardBuilder()

@@ -2,10 +2,52 @@ from typing import Iterable, Optional
 from sqlalchemy import select, func, and_, or_
 from sqlalchemy.orm import Session
 from sqlalchemy.orm import joinedload
+from .users import get_user
 from ..storage.db import SessionLocal
 from ..storage.models import Task, TaskAssignment, User
 from datetime import datetime, timedelta
 
+
+def admin_list_all_tasks() -> list[Task]:
+    with SessionLocal as s:
+        return s.query(Task).order_by(Task.id.desc()).all()
+
+
+def admin_toggle_task_published(task_id: int) -> bool:
+    with SessionLocal() as s:
+        t = s.query(Task).filter(Task.id == task_id).first()
+        if not t:
+            return False
+        t.published = not bool(getattr(t, "published", False))
+        s.commit()
+        return True
+
+def admin_delete_task(task_id: int) -> bool:
+    with SessionLocal() as s:
+        t = s.query(Task).filter(Task.id == task_id).first()
+        if not t:
+            return False
+        s.delete(t)
+        s.commit()
+        return True
+
+
+def admin_create_task(*, title: str, description: str, reward: int, difficulty: str, deadline_days: int) -> int:
+    """difficulty: easy|medium|hard; deadline_days >= 0"""
+    with SessionLocal() as s:
+        t = Task(
+            title=title,
+            description=description,
+            reward=reward,
+            difficulty=difficulty,
+            published=False,
+            created_at=datetime.utcnow(),
+            deadline_days=deadline_days,
+        )
+        s.add(t)
+        s.commit()
+        s.refresh(t)
+        return t.id
 
 def get_active_assignment(user_tg_id: int, task_id: int) -> TaskAssignment | None:
     with SessionLocal() as s:
@@ -42,22 +84,70 @@ def submit_assignment_file(assignment_id: int, file_id: str) -> bool:
         s.commit()
         return True
 
-def seed_tasks_if_empty() -> int:
-    """Наполнить каталог тестовыми задачами один раз."""
+
+
+def _task_field_map() -> dict[str, str | None]:
+    title = "title" if hasattr(Task, "title") else None
+    description = "description" if hasattr(Task, "description") else None
+    reward = "reward" if hasattr(Task, "reward") else ("coins" if hasattr(Task, "coins") else None)
+    difficulty = "difficulty" if hasattr(Task, "difficulty") else ("level" if hasattr(Task, "level") else None)
+    published = "published" if hasattr(Task, "published") else ("is_published" if hasattr(Task, "is_published") else None)
+    deadline_days = "deadline_days" if hasattr(Task, "deadline_days") else ("deadline" if hasattr(Task, "deadline") else None)
+    created_at = "created_at" if hasattr(Task, "created_at") else None
+    return {
+        "title": title,
+        "description": description,
+        "reward": reward,
+        "difficulty": difficulty,
+        "published": published,
+        "deadline_days": deadline_days,
+        "created_at": created_at,
+    }
+
+
+def _create_task_obj(*, title: str, description: str, reward: int, difficulty: str, deadline_days: int) -> Task:
+    fm = _task_field_map()
+    t = Task()  # ВАЖНО: без kwargs!
+
+    if fm["title"]:          setattr(t, fm["title"], title)
+    if fm["description"]:    setattr(t, fm["description"], description)
+    if fm["reward"]:         setattr(t, fm["reward"], reward)
+    if fm["difficulty"]:     setattr(t, fm["difficulty"], difficulty)
+    if fm["published"]:      setattr(t, fm["published"], False)
+    if fm["deadline_days"]:  setattr(t, fm["deadline_days"], deadline_days)
+    if fm["created_at"]:     setattr(t, fm["created_at"], datetime.utcnow())
+
+    return t
+
+
+def admin_create_task(*, title: str, description: str, reward: int, difficulty: str, deadline_days: int) -> int:
     with SessionLocal() as s:
-        count = s.scalar(select(func.count(Task.id)))
-        if count and count > 0:
-            return 0
-        data = [
-            Task(title="Репост события", description="Поделись анонсом в соцсетях", difficulty="easy", reward_coins=3, deadline_hours=24),
-            Task(title="Участие в опросе", description="Ответь на 5 вопросов", difficulty="easy", reward_coins=2, deadline_hours=24),
-            Task(title="Написать пост для блога", description="Пост 1500+ знаков", difficulty="medium", reward_coins=8, deadline_hours=48),
-            Task(title="Снять короткий обзор", description="Видео до 60 секунд", difficulty="medium", reward_coins=10, deadline_hours=72),
-            Task(title="Организовать митап", description="Подготовка и проведение", difficulty="hard", reward_coins=15, deadline_hours=168),
-        ]
-        s.add_all(data)
+        t = _create_task_obj(
+            title=title,
+            description=description,
+            reward=reward,
+            difficulty=difficulty,
+            deadline_days=deadline_days,
+        )
+        s.add(t)
         s.commit()
-        return len(data)
+        s.refresh(t)
+        return t.id
+
+
+def seed_tasks_if_empty() -> None:
+    with SessionLocal() as s:
+        count = s.query(Task).count()
+        if count > 0:
+            return
+        samples = [
+            dict(title="Репост события", description="Сделай репост анонса", reward=3, difficulty="easy",   deadline_days=2),
+            dict(title="Пост в блог",    description="Напиши короткий пост",  reward=8, difficulty="medium", deadline_days=3),
+            dict(title="Организуй митап",description="Подготовь офлайн-встречу", reward=13, difficulty="hard", deadline_days=7),
+        ]
+        for d in samples:
+            s.add(_create_task_obj(**d))
+        s.commit()
 
 def list_tasks(difficulty: Optional[str], page: int = 1, per_page: int = 5) -> list[Task]:
     with SessionLocal() as s:

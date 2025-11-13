@@ -4,7 +4,8 @@ from aiogram.filters import CommandStart, Command
 
 from ..keyboards.common import welcome_kb, roles_grid_kb, main_menu_kb
 from ..services.users import get_or_create_user, set_role
-router = Router()
+
+router = Router(name="start")
 
 WELCOME_TEXT = (
     "👋 Привет, инфлюенсер! Добро пожаловать в INFLUENCE.HUB\n"

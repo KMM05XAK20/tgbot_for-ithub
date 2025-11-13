@@ -1,6 +1,7 @@
 from aiogram import Router, F
 from aiogram.types import CallbackQuery
 from aiogram.exceptions import TelegramBadRequest
+from aiogram.filters import Command
 from ..services.users import get_user
 from ..keyboards.common import profile_kb, main_menu_kb, profile_history_filters_kb, profile_history_list_kb, profile_assignment_kb
 from ..services.tasks import count_assignments_by_status, list_assignments, get_assignment_card, reward_to_difficulty
@@ -8,7 +9,7 @@ from ..services.levels import level_by_coins, render_progress_bar
 from ..services.badges import render_badges_line
 from ..services.rating import get_user_position
 
-router = Router()
+router = Router(name="profile")
 
 def _role_title(code: str | None) -> str:
     mapping = {"active": "Активный спикер", "guru": "Гуру тех.заданий", "helper": "Помогатор"}

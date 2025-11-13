@@ -4,7 +4,7 @@ from aiogram.filters import Command
 from ..keyboards.common import rating_kb
 from ..services.rating import get_leaderboard, get_user_position
 
-router = Router()
+router = Router(name="rating")
 
 @router.message(Command("rating"))
 async def rating_cmd(msg: Message):

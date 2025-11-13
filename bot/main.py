@@ -11,6 +11,7 @@ from .config import get_settings
 
 logging.basicConfig(level=logging.DEBUG)
 
+
 async def main():
     settings = get_settings()
 
@@ -31,6 +32,7 @@ async def main():
         await dp.start_polling(bot)
 
     #await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
+
 
 if __name__ == "__main__":
     asyncio.run(main())

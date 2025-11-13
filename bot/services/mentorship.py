@@ -10,7 +10,7 @@ def create_mentor_application(user_id: int, mentor_id: int, topic: str):
     """
     Создает заявку на менторство для пользователя.
     """
-    with SessionLocal() as session:
+    with SessionLocal() as s:
         application = MentorApplication(
             user_id=user_id,
             mentor_id=mentor_id,
@@ -18,22 +18,61 @@ def create_mentor_application(user_id: int, mentor_id: int, topic: str):
             created_at=datetime.utcnow(),
             status="pending"
         )
-        session.add(application)
-        session.commit()
+        s.add(application)
+        s.commit()
 
 def get_mentor_list() -> list[User]:
     with SessionLocal() as s:
         return(
             s.query(User)
-            .filter(User.role.in_(MENTOR_RULES))
+            .filter(User.role.in_(list(MENTOR_RULES)))
             .order_by(User.coins.desc().nullslast()
-            .all())
+            )
+            .all()
         )
 
 
 
 
 def create_mentor_application(user_id: int, mentor_id: int, topic: MentorTopic) -> MentorApplication:
+    with SessionLocal() as s:
+        exists = (
+            s.query(MentorApplication)
+            .filter(
+                MentorApplication.user_id == user_id,
+                MentorApplication.mentor_id == mentor_id,
+                MentorApplication.topic == topic.value,
+                MentorApplication.status == "pending",
+            )
+            .all()
+        )
+        if exists:
+            return exists
+        app = MentorApplication(
+            user_id=user_id,
+            mentor_id=mentor_id,
+            topic=topic.value,
+            status="pending",
+        )
+        s.add(app)
+        s.commit()
+        s.refresh(app)
+        return app
+    
+
+# read
+def get_user_applications(user_id: int):
+    with SessionLocal() as s:
+        return (
+            s.query(MentorApplication)
+            .filter(MentorApplication.user_id == user_id)
+            .order_by(MentorApplication.created_at.desc())
+            .all()
+        )
+
+
+# record
+def create_mentor_application(user_id: int, mentor_id: int, topic: MentorTopic):
     with SessionLocal() as s:
         exists = (
             s.query(MentorApplication)
@@ -57,15 +96,6 @@ def create_mentor_application(user_id: int, mentor_id: int, topic: MentorTopic) 
         s.commit()
         s.refresh(app)
         return app
-
-def get_user_applications(user_id: int) -> list[MentorApplication]:
-    with SessionLocal as s:
-        return(
-            s.query(MentorApplication)
-            .filter(MentorApplication.user_id == user_id)
-            .order_by(MentorApplication.created_at.desc())
-            .all()
-        )
 
 
 def get_incoming_for_mentor(mentor_id: int, status: str = "pending") -> list[MentorApplication]:

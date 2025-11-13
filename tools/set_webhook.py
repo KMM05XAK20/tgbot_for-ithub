@@ -1,4 +1,3 @@
-# tools/set_webhook.py
 import os, asyncio
 from bot.config import get_settings
 from bot.app_factory import build_dispatcher
