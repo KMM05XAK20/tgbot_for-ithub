@@ -316,3 +316,37 @@ async def mentor_list_view(cb: CallbackQuery):
     await cb.answer()
 
 
+@router.message(Command("make_admin"))
+async def make_admin_handler(msg: Message):
+    """
+    /make_admin <telegram_id>
+    Команда только для СУПЕР-админов из ADMIN_IDS (в .env).
+    """
+    settings = get_settings()
+    super_admins = set(settings.admin_ids or [])
+
+    # 1. Проверяем, что вызывающий — супер-админ
+    if msg.from_user.id not in super_admins:
+        await msg.answer("❌ У тебя нет прав выдавать админку.")
+        return
+
+    parts = msg.text.split()
+    if len(parts) != 2:
+        await msg.answer("Использование: /make_admin <telegram_id>\nПример: /make_admin 8007710555")
+        return
+
+    try:
+        target_tg_id = int(parts[1])
+    except ValueError:
+        await msg.answer("❌ Telegram ID должен быть числом.")
+        return
+
+    ok = set_admin_status(target_tg_id, True)
+    if not ok:
+        await msg.answer(
+            f"❌ Пользователь с tg_id={target_tg_id} не найден в базе.\n"
+            f"Пусть он сначала нажмёт /start у бота."
+        )
+        return
+
+    await msg.answer(f"✅ Пользователь {target_tg_id} теперь администратор.")
