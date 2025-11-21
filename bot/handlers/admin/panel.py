@@ -8,7 +8,7 @@ from ...filters.roles import IsAdmin
 from ...storage.db import SessionLocal
 from ...storage.models import User as UserModel
 from ...keyboards.common import admin_panel_kb, admin_pending_kb, admin_assignment_kb, admin_mentors_root_kb, mentor_role_kb
-from ...services.users import find_user, get_or_create_user, set_user_role, set_admin_status
+from ...services.users import find_user, get_or_create_user, set_user_role, set_admin_status, get_recent_users
 from ...services.mentorship import get_mentor_list
 from ...states.mentorship import AdminMentorAdd, AdminMentorRemove
 from ...services.levels import level_by_coins
@@ -350,3 +350,34 @@ async def make_admin_handler(msg: Message):
         return
 
     await msg.answer(f"✅ Пользователь {target_tg_id} теперь администратор.")
+
+
+@router.message(Command("last_users"))
+async def last_users_handler(msg: Message):
+    """
+    Только для супер-админов.
+    Показывает последних 20 пользователей: tg_id, username, роль, админ/нет.
+    """
+    settings = get_settings()
+    super_admins = set(settings.admin_ids or [])
+
+    if msg.from_user.id not in super_admins:
+        await msg.answer("❌ У тебя нет прав смотреть список пользователей.")
+        return
+
+    users = get_recent_users(limit=20)
+    if not users:
+        await msg.answer("Пользователей в базе пока нет.")
+        return
+
+    lines = []
+    for u in users:
+        admin_flag = "🛡" if getattr(u, "is_admin", False) else "—"
+        uname = f"@{u.username}" if u.username else "—"
+        lines.append(
+            f"{admin_flag} {u.tg_id} · {uname} · {u.role or '—'}"
+        )
+
+    text = "👥 <b>Последние пользователи</b>:\n" + "\n".join(lines)
+    await msg.answer(text)
+

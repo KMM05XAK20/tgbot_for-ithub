@@ -1,5 +1,6 @@
 from typing import Optional
 from sqlalchemy.orm import Session
+from sqlalchemy import desc
 from ..storage.models import User
 from ..storage.db import SessionLocal
 
@@ -57,6 +58,20 @@ def set_user_role(tg_id: int, role: Optional[str]) -> Optional[User]:
         s.commit()
         s.refresh(u)
         return u
+    
+
+
+def get_recent_users(limit: int = 20) -> list[User]:
+    """
+    Вернуть последних N пользователей по дате создания.
+    """
+    with SessionLocal() as s:
+        return (
+            s.query(User)
+            .order_by(desc(User.created_at))
+            .limit(limit)
+            .all()
+        )
 
 def find_user(identifier: str) -> Optional[User]:
     """identifier: '@username' или целое tg_id (строкой)"""
