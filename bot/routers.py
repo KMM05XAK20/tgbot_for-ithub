@@ -5,10 +5,9 @@ root_router = Router(name="root")
 
 from .handlers import start, menu, profile, rating
 from .handlers.task import catalog, submission
-from .handlers.admin import panel
-from .handlers import mentorship, calendar
-from .handlers import debug
+from .handlers import mentorship, calendar, help
 from .handlers.admin import panel, tasks
+from .handlers import debug
 
 # Включаем под-роутеры
 root_router.include_routers(
@@ -22,5 +21,6 @@ root_router.include_routers(
     submission.router,
     mentorship.router,
     calendar.router,
-    debug.router
+    help.router, 
+    debug.router,
 )
