@@ -38,6 +38,13 @@ def set_role(tg_id: int, role: str) -> None:
             session.commit()
 
 
+def set_admin_status(tg_id: int, is_admin: bool):
+    with SessionLocal() as s:
+        user = s.query(User).filter(User.tg_id == tg_id).first()
+        if user:
+            user.is_admin = is_admin
+            s.commit()
+        return user
 
 def set_user_role(tg_id: int, role: Optional[str]) -> Optional[User]:
     """role: 'guru' | 'helper' | None (снять роль)"""
