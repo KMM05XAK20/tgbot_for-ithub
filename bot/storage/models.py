@@ -1,6 +1,6 @@
 # bot/storage/models.py
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey, Enum
+from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey, Enum, Boolean
 from sqlalchemy.orm import relationship
 from sqlalchemy.ext.declarative import declarative_base
 from .db import Base, engine
@@ -15,7 +15,11 @@ class User(Base):
     username = Column(String, nullable=True)
     role = Column(String, nullable=True)          # "active" | "guru" | "helper"
     coins = Column(Integer, default=0)
+
+    is_admin = Column(Boolean, default=False)
+
     created_at = Column(DateTime, default=datetime.utcnow)
+
 
 #--- Mentors ------------------------------------------------------------------
 
@@ -32,10 +36,9 @@ class MentorApplication(Base):
     user_id = Column(Integer, ForeignKey('users.id'))
     mentor_id = Column(Integer, ForeignKey('users.id'))
     topic = Column(Enum(MentorTopic))
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     status = Column(Enum("pending", "accepted", "rejected", name="application_status"), default="pending")
     comment = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     decided_at = Column(DateTime, nullable=True)
 
     user = relationship("User", foreign_keys=[user_id])

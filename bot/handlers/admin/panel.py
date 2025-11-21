@@ -5,6 +5,8 @@ from aiogram.fsm.context import FSMContext
 from datetime import datetime, timedelta
 
 from ...filters.roles import IsAdmin
+from ...storage.db import SessionLocal
+from ...storage.models import User as UserModel
 from ...keyboards.common import admin_panel_kb, admin_pending_kb, admin_assignment_kb, admin_mentors_root_kb, mentor_role_kb
 from ...services.users import find_user, get_or_create_user, set_user_role
 from ...services.mentorship import get_mentor_list
@@ -44,6 +46,52 @@ async def admin_pending(cb: CallbackQuery):
     text = "🕒 <b>На проверке</b>\n" + "\n".join(lines) + "\n\nОткрой карточку: напиши в чат <code>admin:view:&lt;id&gt;</code>"
     await cb.message.edit_text(text, reply_markup=admin_pending_kb(page), disable_web_page_preview=True)
     await cb.answer()
+
+@router.message(IsAdmin(), Command("add_admin"))
+async def add_admin(msg: Message):
+    if not msg.reply_to_message:
+        return await msg.answer("Сделай /add_admin ответом на сообщение пользывателя.")
+
+    target = msg.reply_to_message.from_user
+    tg_id = target.id
+
+    with SessionLocal() as s:
+        user = s.query(UserModel).filter_by(tg_id=tg_id).first()
+        if not user:
+            user = UserModel(
+                tg_id=tg_id,
+                username=target.username
+            )
+            s.add(user)
+        user.is_admin = True
+        s.commit()
+
+    await msg.answer(f"✅ Пользователь @{target.username or tg_id} теперь администратор.")
+
+@router.message(IsAdmin(), Command("del_admin"))
+async def del_admin(msg: Message):
+    if not msg.reply_to_message:
+        return await msg.answer("Сделай /del_admin ответом на сообщение пользователя.")
+
+    target = msg.reply_to_message.from_user
+    tg_id = target.id
+
+    from ...config import get_settings
+    settings = get_settings()
+    super_ids = set(settings.admin_ids or [])
+
+    # не даём снести супер-админа из .env
+    if tg_id in super_ids:
+        return await msg.answer("Нельзя снять супер-админа, он прописан в .env")
+
+    with SessionLocal() as s:
+        user = s.query(UserModel).filter_by(tg_id=tg_id).first()
+        if not user or not user.is_admin:
+            return await msg.answer("Этот пользователь и так не админ.")
+        user.is_admin = False
+        s.commit()
+
+    await msg.answer(f"🚫 Пользователь @{target.username or tg_id} больше не админ.")
 
 # Просмотр карточки по текстовой команде: admin:view:<id>
 @router.message(F.text.startswith("admin:view:"), IsAdmin())
