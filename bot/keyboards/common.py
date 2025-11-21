@@ -39,6 +39,16 @@ def admin_pending_kb(page: int) -> InlineKeyboardMarkup:
     kb.adjust(3)
     return kb.as_markup()
 
+def admin_grant_kb(user_id: int):
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(
+                text="🛡 Выдать админку",
+                callback_data=f"admin:grant:{user_id}"
+            )
+        ]
+    ])
+
 # approve/reject --> task
 def admin_assignment_kb(aid: int) -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()

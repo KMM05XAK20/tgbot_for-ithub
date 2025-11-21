@@ -8,7 +8,7 @@ from ...filters.roles import IsAdmin
 from ...storage.db import SessionLocal
 from ...storage.models import User as UserModel
 from ...keyboards.common import admin_panel_kb, admin_pending_kb, admin_assignment_kb, admin_mentors_root_kb, mentor_role_kb
-from ...services.users import find_user, get_or_create_user, set_user_role
+from ...services.users import find_user, get_or_create_user, set_user_role, set_admin_status
 from ...services.mentorship import get_mentor_list
 from ...states.mentorship import AdminMentorAdd, AdminMentorRemove
 from ...services.levels import level_by_coins
@@ -18,6 +18,7 @@ from ...services.tasks import (
     approve_assignment, reject_assignment
 )
 from ...services.calendar import create_event
+from ...config import get_settings
 
 router = Router(name="admin_panel")
 
@@ -92,6 +93,24 @@ async def del_admin(msg: Message):
         s.commit()
 
     await msg.answer(f"🚫 Пользователь @{target.username or tg_id} больше не админ.")
+
+
+@router.callback_query(F.data.startswith("admin:grant:"))
+async def admin_grant(cb: CallbackQuery):
+    settings = get_settings()
+
+    # Проверяем, что вызывающий — супер-админ
+    if cb.from_user.id not in settings.admin_ids:
+        await cb.answer("❌ Недостаточно прав", show_alert=True)
+        return
+
+    target_id = int(cb.data.split(":")[2])
+
+    # Обновляем базу
+    set_admin_status(target_id, True)
+
+    await cb.answer("Пользователь теперь админ!", show_alert=True)
+    await cb.message.edit_text("Админка выдана.")
 
 # Просмотр карточки по текстовой команде: admin:view:<id>
 @router.message(F.text.startswith("admin:view:"), IsAdmin())

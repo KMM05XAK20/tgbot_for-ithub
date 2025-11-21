@@ -3,7 +3,9 @@ from aiogram import Router, F
 from aiogram.filters import Command
 from aiogram.types import Message, CallbackQuery
 
-from ..keyboards.common import main_menu_kb
+from ..services.users import get_user
+from ..keyboards.common import main_menu_kb, admin_grant_kb
+from ..config import get_settings
 
 router = Router(name="help")
 
@@ -22,6 +24,27 @@ HELP_TEXT = (
     "• /whoime — информация о твоём профиле (id, роль, админ)\n"
 )
 
+
+
+@router.message(Command("whoime"))
+async def whoime(msg: Message):
+    user = get_user(msg.from_user.id)
+    settings = get_settings()
+
+    text = (
+        f"🆔 {msg.from_user.id}\n"
+        f"👤 @{msg.from_user.username}\n"
+        f"🎭 Роль: {user.role}\n"
+        f"🪙 Coins: {user.coins}\n"
+        f"🛡 Админ: {'да' if user.is_admin else 'нет'}\n"
+        f"👑 Супер-админ: {'да' if msg.from_user.id in settings.admin_ids else 'нет'}"
+    )
+
+    # Если вызывающий — супер-админ → показать кнопки
+    if msg.from_user.id in settings.admin_ids:
+        await msg.answer(text, reply_markup=admin_grant_kb(msg.from_user.id))
+    else:
+        await msg.answer(text)
 
 @router.message(Command("help"))
 async def help_command(msg: Message):
