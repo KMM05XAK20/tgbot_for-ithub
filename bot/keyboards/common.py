@@ -72,7 +72,7 @@ def admin_review_root_kb() -> InlineKeyboardMarkup:
         [InlineKeyboardButton(text="⬅️ Назад", callback_data="admin:panel")],
     ])
 
-def admin_review_item_kb() -> InlineKeyboardMarkup:
+def admin_review_item_kb(assignment_id: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="✅ Принять", callback_data=f"admin:review:{assignment_id}:approve")],
         [InlineKeyboardButton(text="❌ Отклонить", callback_data=f"admin:review:{assignment_id}:reject")],
@@ -172,11 +172,12 @@ def mentor_role_kb(tg_id: int) -> InlineKeyboardMarkup:
     ])
 
 
-def mentor_menu_kb():
-    kb = InlineKeyboardMarkup(row_width=1)
+def mentor_menu_kb() -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
     kb.add(InlineKeyboardButton(text="Стать ментором", callback_data="mentor:become"))
     kb.add(InlineKeyboardButton(text="Выбрать наставника", callback_data="mentor:choose"))
-    return kb
+    kb.adjust(1)
+    return kb.as_markup()
 
 def mentor_list_kb(mentors: list) -> InlineKeyboardMarkup:
     rows = []
@@ -217,19 +218,22 @@ def roles_grid_kb() -> InlineKeyboardMarkup:
     kb.button(text="👤 Активный спикер", callback_data="role:choose:active")
     kb.button(text="📚 Гуру тех.заданий", callback_data="role:choose:guru")
     kb.button(text="🏆 Помогатор", callback_data="role:choose:helper")
-    kb.adjust(1)  # по одной в столбик; поменяй на 2/3 для сетки
+    kb.adjust(2)  # по одной в столбик; поменяй на 2/3 для сетки
     return kb.as_markup()
 # tasks
+
+
 def tasks_filters_kb() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [
-            InlineKeyboardButton(text="🟢 Лёгкие",  callback_data="tasks:filter:easy"),
-            InlineKeyboardButton(text="🟡 Средние", callback_data="tasks:filter:medium"),
-            InlineKeyboardButton(text="🔴 Сложные", callback_data="tasks:filter:hard"),
-            InlineKeyboardButton(text="🗂 Все", callback_data="tasks:filter:all")
-        ],
-        [InlineKeyboardButton(text="⬅️ В меню", callback_data="menu:open:main")],
-    ])
+    # Создаем клавиатуру с параметром `type`
+    kb =InlineKeyboardBuilder()
+    kb.add(
+        InlineKeyboardButton(text="🟢 Лёгкие", callback_data="tasks:filter:easy"),
+        InlineKeyboardButton(text="🟡 Средние", callback_data="tasks:filter:medium"),
+        InlineKeyboardButton(text="🔴 Сложные", callback_data="tasks:filter:hard"),
+        InlineKeyboardButton(text="⬅️ В меню", callback_data="menu:open:tasks")
+    )
+    kb.adjust(2)
+    return kb.as_markup()
 
 
 
@@ -300,8 +304,9 @@ def calendar_root_kb() -> InlineKeyboardMarkup:
     ])
     return kb
 
-def calendar_kb():
-    kb = InlineKeyboardMarkup(row_width=2)
+def calendar_kb() -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder
     kb.add(InlineKeyboardButton(text="Весь календарь", callback_data="calendar:all"))
     kb.add(InlineKeyboardButton(text="⬅️ Назад", callback_data="menu:open:profile"))
-    return kb
+    kb.adjust(2)
+    return kb.as_markup()

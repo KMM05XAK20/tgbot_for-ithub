@@ -3,35 +3,11 @@ from aiogram.types import CallbackQuery
 from aiogram.enums import ParseMode
 from ...services.tasks import list_tasks, get_task, take_task,  has_active_assignment, seed_tasks_if_empty, get_active_assignment
 from ...keyboards.common import tasks_filters_kb, tasks_list_kb, task_details_kb, main_menu_kb
+from ...utils.telegram import safe_edit_text
+
 
 router = Router(name="tasks_catalog")
 
-@router.callback_query(F.data.startswith("tasks:view:"))
-async def view_task(cb: CallbackQuery):
-    task_id = int(cb.data.split(":")[2])
-    t = get_task(task_id)
-    if not t:
-        await cb.answer("Задание не найдено")
-        return
-    text = (
-        f"📱 <b>{t['title']}</b>\n"
-        f"💰 Награда: {t['reward']} coins\n"
-        f"⏱ Дедлайн: {t.get('deadline_text','—')}\n\n"
-        f"{t.get('description','Без описания')}"
-    )
-    await cb.message.edit_text(text, reply_markup=task_details_kb(task_id), parse_mode=ParseMode.HTML)
-    await cb.answer()
-
-def _difficulty_title(code: str) -> str:
-    return {"easy": "🟢 Легкие", "medium": "🟡 Средние", "hard": "🔴 Сложные"}.get(code, "🗂 Все")
-
-@router.callback_query(F.data == "menu:open:tasks")
-async def open_tasks_root(cb: CallbackQuery):
-    # Однократное наполнение тестовыми заданиями (безопасно)
-    seed_tasks_if_empty()
-    text = "📚 <b>Каталог заданий</b>\nВыбери сложность:"
-    await cb.message.edit_text(text, reply_markup=tasks_filters_kb())
-    await cb.answer()
 
 @router.callback_query(F.data == "menu:open:tasks")
 async def open_tasks_root(cb: CallbackQuery):
@@ -44,8 +20,75 @@ async def open_tasks_root(cb: CallbackQuery):
         "• 🟡 Средние (5–10 coins)\n"
         "• 🔴 Сложные (10–15 coins)\n"
     )
-    await cb.message.edit_text(text, reply_markup=tasks_filters_kb(), parse_mode=ParseMode.HTML)
+    await safe_edit_text(cb.message, text, reply_markup=tasks_filters_kb(), ParseMode=ParseMode.HTML)
     await cb.answer()
+
+@router.callback_query(F.data.startswith("task:filter:"))
+async def filter_tasks(cb: CallbackQuery):
+    diff = cb.data.split(":",)[2] #e|n or m |h
+    ranges = {"easy": (1,2), "medium": (5, 10), "hard": (10, 15)}
+    min_c, max_c = ranges.get(diff, (None, None))
+
+    tasks = list_tasks(min_reward=min_c, max_reward=max_c, difficulty=diff, only_published=True)
+    if not tasks:
+        await cb.message.edit_text("Пока нет заданий в этой категории.", reply_markup=tasks_filters_kb())
+        await cb.answer()
+
+        mark = "🟢" if diff == "easy" else "🟡" if diff == "medium" else "🔴"
+        await safe_edit_text(
+            cb.message,
+            f"📚 Задания {mark}\nВыбери задание:",
+            reply_markup=tasks_list_kb(tasks),
+        )
+        await cb.answer()
+
+
+@router.callback_query(F.data.startswith("task:view:"))
+async def view_task(cb: CallbackQuery):
+    task_id = int(cb.data.split(":")[2])
+    t = get_task(task_id)
+    if not t:
+        await cb.answer("Задание не найдено")
+        return
+    
+    title = getattr(t, "title", getattr(t, "name", f"task #{task_id}"))
+    reward = getattr(t, "reward", getattr(t, "coins", "—"))
+    deadline_text = getattr(t, "deadline_text", "—")
+    description = getattr(t, "description", "Без описания")
+
+    
+    text = (
+        f"📱 <b>{title}</b>\n"
+        f"💰 Награда: {reward} coins\n"
+        f"⏱ Дедлайн: {deadline_text}\n\n"
+        f"{description}"
+    )
+    await cb.message.edit_text(text, reply_markup=task_details_kb(task_id), parse_mode=ParseMode.HTML)
+    await cb.answer()
+
+
+def _difficulty_title(code: str) -> str:
+    return {"easy": "🟢 Легкие", "medium": "🟡 Средние", "hard": "🔴 Сложные"}.get(code, "🗂 Все")
+
+
+
+# @router.callback_query(F.data.startswith("tasks:view:"))
+# async def view_task(cb: CallbackQuery):
+#     task_id = int(cb.data.split(":")[2])
+#     t = get_task(task_id)
+#     if not t:
+#         await cb.answer("Задание не найдено")
+#         return
+#     text = (
+#         f"📱 <b>{t['title']}</b>\n"
+#         f"💰 Награда: {t['reward']} coins\n"
+#         f"⏱ Дедлайн: {t.get('deadline_text','—')}\n\n"
+#         f"{t.get('description','Без описания')}"
+#     )
+#     await cb.message.edit_text(text, reply_markup=task_details_kb(task_id), parse_mode=ParseMode.HTML)
+#     await cb.answer()
+
+
 # fake-copy function
 # @router.callback_query(F.data.startswith("tasks:view:"))
 # async def view_task(cb: CallbackQuery):
