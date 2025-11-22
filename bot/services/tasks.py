@@ -8,20 +8,82 @@ from ..storage.models import Task, TaskAssignment, User
 from datetime import datetime, timedelta
 
 
-def admin_create_task(*, title: str, description: str, reward: int, difficulty: str, deadline_days: int) -> int:
-    """difficulty: easy|medium|hard; deadline_days >= 0"""
+def reward_to_difficulty(reward: int) -> str:
+    """
+    Маппинг сложности по монетам.
+    🟢 easy:   <=5
+    🟡 medium: 6..10
+    🔴 hard:   >10
+    """
+    if reward <= 5:
+        return "easy"
+    elif reward <= 10:
+        return "medium"
+    else:
+        return "hard"
+
+
+def difficulty_condition(diff: str):
+    """
+    Возвращает SQL-условие по Task.reward_coins для сложностей easy/medium/hard.
+    """
+    diff = (diff or "all").lower()
+    if diff == "easy":
+        return Task.reward_coins <= 5
+    if diff == "medium":
+        return and_(Task.reward_coins >= 6, Task.reward_coins <= 10)
+    if diff == "hard":
+        return Task.reward_coins > 10
+    return None  # all
+
+
+
+def admin_create_task(
+    *,
+    title: str,
+    description: str,
+    reward: int,
+    deadline_days: int,
+    difficulty: str | None = None,   # <-- теперь НЕобязательный
+) -> int:
+    """
+    Создание задачи из-под админки.
+    Если difficulty не передано — вычисляем автоматически по reward.
+    """
+    if difficulty is None:
+        difficulty = reward_to_difficulty(reward)
+
     with SessionLocal() as s:
-        t = _create_task_obj(
+        t = Task(
             title=title,
             description=description,
-            reward=reward,
+            reward_coins=reward,   # если у тебя поле называется reward_coins
             difficulty=difficulty,
             deadline_days=deadline_days,
+            status="active",
+            is_published=True,
         )
         s.add(t)
         s.commit()
         s.refresh(t)
         return t.id
+    
+# def admin_create_task(*, title: str, description: str, reward: int, difficulty: str, deadline_days: int) -> int:
+#     """difficulty: easy|medium|hard; deadline_days >= 0"""
+#     with SessionLocal() as s:
+#         difficulty = reward_to_difficulty(reward)
+#         t = _create_task_obj(
+#             title=title,
+#             description=description,
+#             reward=reward,
+#             difficulty=difficulty,
+#             is_published=True,
+#             deadline_days=deadline_days,
+#         )
+#         s.add(t)
+#         s.commit()
+#         s.refresh(t)
+#         return t.id
 
 def admin_delete_task(task_id: int) -> bool:
     with SessionLocal() as s:
@@ -49,6 +111,15 @@ def admin_toggle_task_publised(task_id: int) -> bool:
         setattr(t, pub_f, not bool(getattr(t, pub_f)))
         s.commit()
         return True
+
+# определение сложности задачи
+def classify_difficulty(reward: int) -> str:
+    if reward <= 5:
+        return "easy"
+    elif reward <= 10:
+        return "medium"
+    else:
+        return "hard"
 
 def get_active_assignment(user_tg_id: int, task_id: int) -> TaskAssignment | None:
     with SessionLocal() as s:
@@ -121,21 +192,6 @@ def _create_task_obj(*, title: str, description: str, reward: int, difficulty: s
     return t
 
 
-def admin_create_task(*, title: str, description: str, reward: int, difficulty: str, deadline_days: int) -> int:
-    with SessionLocal() as s:
-        t = _create_task_obj(
-            title=title,
-            description=description,
-            reward=reward,
-            difficulty=difficulty,
-            deadline_days=deadline_days,
-        )
-        s.add(t)
-        s.commit()
-        s.refresh(t)
-        return t.id
-
-
 def seed_tasks_if_empty() -> None:
     with SessionLocal() as s:
         count = s.query(Task).count()
@@ -170,6 +226,13 @@ def list_tasks(*, min_reward: int | None = None, max_reward: int | None = None,
                 q = q.filter(getattr(Task, rew_f) <= max_reward)
         return q.order_by(Task.id.desc()).all()
 
+def list_public_tasks(difficulty: str | None = None) -> list[Task]:
+    with SessionLocal() as s:
+        q = s.query(Task).filter(Task.is_published.is_(True))
+        if difficulty in ("easy", "medium", "hard"):
+            q = q.filter(Task.difficulty == difficulty)
+        # можно ещё сортировку по reward или id
+        return q.all()
 def get_task(task_id: int):
     with SessionLocal() as s:
         return s.query(Task).filter(Task.id == task_id).first()
@@ -205,7 +268,7 @@ def take_task(user_tg_id: int, task_id: int) -> bool:
         ).scalar_one_or_none()
         if dup:
             return False
-        due = datetime.utcnow() + timedelta(hours=task.deadline_hours or 48)
+        due = datetime.utcnow() + timedelta(days=task.deadline_days or 2)
         s.add(TaskAssignment(task_id=task.id, user_id=user.id, due_at=due))
         s.commit()
         return True
@@ -533,29 +596,3 @@ def moderate_assignment(assignment_id: int, approve: bool) -> Optional[TaskAssig
         return a
 
 
-def reward_to_difficulty(reward: int | None) -> str:
-    """
-    Маппинг сложности по монетам.
-    🟢 easy:   <=5
-    🟡 medium: 6..10
-    🔴 hard:   >10
-    """
-    r = int(reward or 0)
-    if r <= 5:
-        return "easy"
-    if r <= 10:
-        return "medium"
-    return "hard"
-
-def difficulty_condition(diff: str):
-    """
-    Возвращает SQL-условие по Task.reward_coins для сложностей easy/medium/hard.
-    """
-    diff = (diff or "all").lower()
-    if diff == "easy":
-        return Task.reward_coins <= 5
-    if diff == "medium":
-        return and_(Task.reward_coins >= 6, Task.reward_coins <= 10)
-    if diff == "hard":
-        return Task.reward_coins > 10
-    return None  # all

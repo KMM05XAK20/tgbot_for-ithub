@@ -8,7 +8,7 @@ from ...services.tasks import (
     admin_create_task, seed_tasks_if_empty
 )
 from ...states.tasks_admin import AdminTaskCreate
-
+from ...states.tasks import TaskCreateStates
 router = Router(name="admin_tasks")
 
 # Вход в раздел
@@ -65,57 +65,85 @@ async def admin_tasks_seed(cb: CallbackQuery):
         await cb.message.edit_text("📋 Список заданий:", reply_markup=admin_tasks_list_kb(items))
 
 # Создание — шаги FSM
-@router.callback_query(IsAdmin(), F.data == "admin:tasks:add")
+@router.callback_query(F.data == "admin:tasks:add", IsAdmin())
 async def admin_tasks_add_start(cb: CallbackQuery, state: FSMContext):
-    await state.set_state(AdminTaskCreate.title)
-    await cb.message.edit_text("Введите <b>заголовок</b> задания:", parse_mode="HTML")
+    await state.set_state(TaskCreateStates.waiting_title)
+    await cb.message.edit_text("✏️ Введите заголовок задания:")
     await cb.answer()
 
-@router.message(IsAdmin(), AdminTaskCreate.title)
+
+# Шаг 1 — заголовок
+@router.message(TaskCreateStates.waiting_title)
 async def admin_tasks_add_title(msg: Message, state: FSMContext):
-    await state.update_data(title=msg.text.strip())
-    await state.set_state(AdminTaskCreate.description)
-    await msg.answer("Введите <b>описание</b> задания:", parse_mode="HTML")
+    title = msg.text.strip()
+    if not title:
+        await msg.answer("Заголовок не может быть пустым. Введите ещё раз:")
+        return
 
-@router.message(IsAdmin(), AdminTaskCreate.description)
-async def admin_tasks_add_desc(msg: Message, state: FSMContext):
-    await state.update_data(description=msg.text.strip())
-    await state.set_state(AdminTaskCreate.reward)
-    await msg.answer("Введите <b>награду</b> (целое число coins):", parse_mode="HTML")
+    await state.update_data(title=title)
+    await msg.answer("📝 Введите описание задания:")
+    await state.set_state(TaskCreateStates.waiting_description)
 
-@router.message(IsAdmin(), AdminTaskCreate.reward)
+# Шаг 2 — описание
+@router.message(TaskCreateStates.waiting_description)
+async def admin_tasks_add_description(msg: Message, state: FSMContext):
+    desc = msg.text.strip()
+    await state.update_data(description=desc)
+    await msg.answer("💰 Введите награду в coins (целое число):")
+    await state.set_state(TaskCreateStates.waiting_reward)
+
+
+# Шаг 3 — награда
+@router.message(TaskCreateStates.waiting_reward)
 async def admin_tasks_add_reward(msg: Message, state: FSMContext):
-    if not msg.text.isdigit():
-        return await msg.answer("Нужно целое число. Введите награду ещё раз.")
-    await state.update_data(reward=int(msg.text))
-    await state.set_state(AdminTaskCreate.difficulty)
-    await msg.answer("Введите <b>сложность</b>: easy | medium | hard", parse_mode="HTML")
+    text = msg.text.strip()
+    try:
+        reward = int(text)
+    except ValueError:
+        await msg.answer("Награда должна быть числом. Попробуйте ещё раз:")
+        return
 
-@router.message(IsAdmin(), AdminTaskCreate.difficulty)
-async def admin_tasks_add_diff(msg: Message, state: FSMContext):
-    diff = msg.text.strip().lower()
-    if diff not in {"easy", "medium", "hard"}:
-        return await msg.answer("Допустимо: easy | medium | hard. Введите ещё раз.")
-    await state.update_data(difficulty=diff)
-    await state.set_state(AdminTaskCreate.deadline_days)
-    await msg.answer("Введите <b>дедлайн в днях</b> (0 — без дедлайна):", parse_mode="HTML")
+    if reward <= 0:
+        await msg.answer("Награда должна быть больше нуля. Попробуйте ещё раз:")
+        return
 
-@router.message(IsAdmin(), AdminTaskCreate.deadline_days)
+    await state.update_data(reward=reward)
+    await msg.answer("⏱ Введите дедлайн в днях (например, 2):")
+    await state.set_state(TaskCreateStates.waiting_deadline)
+
+
+# Шаг 4 — дедлайн и финальное сохранение
+@router.message(TaskCreateStates.waiting_deadline)
 async def admin_tasks_add_deadline(msg: Message, state: FSMContext):
-    if not msg.text.isdigit():
-        return await msg.answer("Нужно целое число дней. Введите ещё раз.")
-    await state.update_data(deadline_days=int(msg.text))
+    text = msg.text.strip()
+    try:
+        deadline_days = int(text)
+    except ValueError:
+        await msg.answer("Дедлайн должен быть числом (в днях). Попробуйте ещё раз:")
+        return
+
     data = await state.get_data()
-    tid = admin_create_task(
-        title=data["title"],
-        description=data["description"],
-        reward=data["reward"],
-        difficulty=data["difficulty"],
-        deadline_days=data["deadline_days"],
-    )
     await state.clear()
-    await msg.answer(f"✅ Задание создано (id={tid}). По умолчанию *скрыто*, опубликуйте в списке.",
-                     reply_markup=admin_tasks_root_kb(), parse_mode="Markdown")
+
+    title = data.get("title")
+    description = data.get("description") or ""
+    reward = data.get("reward")
+
+    # ВАЖНО: здесь НИЧЕГО не спрашиваем про сложность —
+    # она определяется автоматически по reward внутри admin_create_task
+    task_id = admin_create_task(
+        title=title,
+        description=description,
+        reward=reward,
+        deadline_days=deadline_days,
+        #deadline_hours=deadline_hours,
+    )
+
+    await msg.answer(
+        f"✅ Задание создано (ID: {task_id}).\n"
+        f"Оно уже доступно в каталоге, сложность определена автоматически.",
+        reply_markup=admin_tasks_root_kb(),
+    )
 
 @router.callback_query(IsAdmin(), F.data.startswith("admin:tasks:nop:"))
 async def admin_tasks_noop(cb: CallbackQuery):

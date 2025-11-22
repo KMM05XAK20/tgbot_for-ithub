@@ -50,11 +50,13 @@ class Task(Base):
 
     id = Column(Integer, primary_key=True)
     title = Column(String, nullable=False)
-    description = Column(Text, nullable=True)
+    description = Column(Text)
     difficulty = Column(String, nullable=False)   # "easy" | "medium" | "hard"
-    reward_coins = Column(Integer, default=1)
-    deadline_hours = Column(Integer, default=48)
-    status = Column(String, default="active")     # "active" | "archived"
+    reward_coins = Column(Integer, nullable=False)
+    deadline_days = Column(Integer, nullable=True)
+    #deadline_hours = Column(Integer, default=48)
+    status = Column(String, default="active", nullable=False)     # "active" | "archived"
+    is_published = Column(Boolean, default=True, nullable=False)
 
 # --- Task assignments ---------------------------------------------------------
 class TaskAssignment(Base):

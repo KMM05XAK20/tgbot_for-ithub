@@ -1,25 +1,67 @@
 from aiogram import Router, F
 from aiogram.types import CallbackQuery
 from aiogram.enums import ParseMode
-from ...services.tasks import list_tasks, get_task, take_task,  has_active_assignment, seed_tasks_if_empty, get_active_assignment
+from ...services.tasks import list_tasks, list_public_tasks, get_task, take_task,  has_active_assignment, seed_tasks_if_empty, get_active_assignment
 from ...keyboards.common import tasks_filters_kb, tasks_list_kb, task_details_kb, main_menu_kb
 from ...utils.telegram import safe_edit_text
 
 
 router = Router(name="tasks_catalog")
 
+def render_tasks_list(tasks, title: str = "📚 Каталог заданий") -> str:
+    """
+    Превращает список задач из БД в красивый текст для Telegram.
+    """
+    if not tasks:
+        return f"{title}\n\nПока нет заданий в этой категории."
+
+    lines: list[str] = [title, ""]
+    for t in tasks:
+        # подстраховка, если нет полей
+        task_id = getattr(t, "id", None)
+        reward = getattr(t, "reward", None)
+        diff = getattr(t, "difficulty", None)
+
+        diff_emoji = {
+            "easy": "🟢",
+            "medium": "🟡",
+            "hard": "🔴",
+        }.get(diff or "", "⚪️")
+
+        # одна карточка задания
+        block = [
+            f"{diff_emoji} <b>{getattr(t, 'title', 'Без названия')}</b>",
+        ]
+        if getattr(t, "description", None):
+            block.append(f"📝 {t.description}")
+        if reward is not None:
+            block.append(f"💰 Награда: {reward} coins")
+        if task_id is not None:
+            block.append(f"🔎 ID: {task_id}")
+
+        lines.append("\n".join(block))
+        lines.append("")  # пустая строка между заданиями
+
+    return "\n".join(lines).strip()
+
 
 @router.callback_query(F.data == "menu:open:tasks")
 async def open_tasks_root(cb: CallbackQuery):
     # на всякий случай — если в базе нет заданий, подсеять примеры
     seed_tasks_if_empty()
+
     text = (
         "📚 <b>Каталог заданий</b>\n"
-        "Выбери уровень сложности, чтобы посмотреть задания.\n\n"
-        "• 🟢 Лёгкие (1–5 coins)\n"
-        "• 🟡 Средние (5–10 coins)\n"
-        "• 🔴 Сложные (10–15 coins)\n"
+        "Выбери уровень сложности:"
     )
+
+    # text = (
+    #     "📚 <b>Каталог заданий</b>\n"
+    #     "Выбери уровень сложности, чтобы посмотреть задания.\n\n"
+    #     "• 🟢 Лёгкие (1–5 coins)\n"
+    #     "• 🟡 Средние (5–10 coins)\n"
+    #     "• 🔴 Сложные (10–15 coins)\n"
+    # )
     await safe_edit_text(cb.message, text, reply_markup=tasks_filters_kb(), ParseMode=ParseMode.HTML)
     await cb.answer()
 
@@ -71,6 +113,28 @@ def _difficulty_title(code: str) -> str:
     return {"easy": "🟢 Легкие", "medium": "🟡 Средние", "hard": "🔴 Сложные"}.get(code, "🗂 Все")
 
 
+@router.callback_query(F.data == "tasks:filter:easy")
+async def tasks_easy(cb: CallbackQuery):
+    tasks = list_public_tasks(difficulty="easy")
+    text = render_tasks_list(tasks, title="🟢 Лёгкие задания")
+    await cb.message.edit_text(text, reply_markup=tasks_filters_kb())
+    await cb.answer()
+
+
+@router.callback_query(F.data == "tasks:filter:medium")
+async def tasks_medium(cb: CallbackQuery):
+    tasks = list_public_tasks(difficulty="medium")
+    text = render_tasks_list(tasks, title="🟡 Средние задания")
+    await cb.message.edit_text(text, reply_markup=tasks_filters_kb())
+    await cb.answer()
+
+
+@router.callback_query(F.data == "tasks:filter:hard")
+async def tasks_hard(cb: CallbackQuery):
+    tasks = list_public_tasks(difficulty="hard")
+    text = render_tasks_list(tasks, title="🔴 Сложные задания")
+    await cb.message.edit_text(text, reply_markup=tasks_filters_kb())
+    await cb.answer()
 
 # @router.callback_query(F.data.startswith("tasks:view:"))
 # async def view_task(cb: CallbackQuery):
