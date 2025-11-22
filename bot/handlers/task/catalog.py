@@ -4,86 +4,84 @@ from aiogram.enums import ParseMode
 from ...services.tasks import list_tasks, list_public_tasks, get_task, take_task,  has_active_assignment, seed_tasks_if_empty, get_active_assignment
 from ...keyboards.common import tasks_filters_kb, tasks_list_kb, task_details_kb, main_menu_kb
 from ...utils.telegram import safe_edit_text
+from ...storage.models import Task
 
 
 router = Router(name="tasks_catalog")
 
-def render_tasks_list(tasks, title: str = "📚 Каталог заданий") -> str:
+
+
+def render_tasks_list(tasks: list[Task], title: str = "📚 Каталог заданий") -> str:
     """
-    Превращает список задач из БД в красивый текст для Telegram.
+    Строит текстовый список заданий для каталога.
+    Показывает награду, дедлайн и человеческую сложность.
     """
     if not tasks:
         return f"{title}\n\nПока нет заданий в этой категории."
 
+    diff_labels = {
+        "easy": "🟢 Лёгкое",
+        "medium": "🟡 Среднее",
+        "hard": "🔴 Сложное",
+    }
+
     lines: list[str] = [title, ""]
+
     for t in tasks:
-        # подстраховка, если нет полей
-        task_id = getattr(t, "id", None)
-        reward = getattr(t, "reward", None)
-        diff = getattr(t, "difficulty", None)
+        reward = getattr(t, "reward_coins", None) or 0
+        dd = getattr(t, "deadline_days", None)
+        deadline_part = f"\n  ⏱ Дедлайн: {dd} дн." if dd else ""
 
-        diff_emoji = {
-            "easy": "🟢",
-            "medium": "🟡",
-            "hard": "🔴",
-        }.get(diff or "", "⚪️")
+        diff_code = getattr(t, "difficulty", None)
+        diff_human = diff_labels.get(diff_code, "⚪️ Без метки")
 
-        # одна карточка задания
-        block = [
-            f"{diff_emoji} <b>{getattr(t, 'title', 'Без названия')}</b>",
-        ]
-        if getattr(t, "description", None):
-            block.append(f"📝 {t.description}")
-        if reward is not None:
-            block.append(f"💰 Награда: {reward} coins")
-        if task_id is not None:
-            block.append(f"🔎 ID: {task_id}")
+        lines.append(
+            f"• <b>{t.title}</b>\n"
+            f"  🎯 Сложность: {diff_human}\n"
+            f"  💰 Награда: {reward} coins"
+            f"{deadline_part}\n"
+            f"  ID: {t.id}"
+        )
 
-        lines.append("\n".join(block))
-        lines.append("")  # пустая строка между заданиями
-
-    return "\n".join(lines).strip()
+    return "\n\n".join(lines)
 
 
 @router.callback_query(F.data == "menu:open:tasks")
 async def open_tasks_root(cb: CallbackQuery):
-    # на всякий случай — если в базе нет заданий, подсеять примеры
-    seed_tasks_if_empty()
+    tasks = list_public_tasks(difficulty="all")
+    text = render_tasks_list(tasks, title="📚 Каталог заданий")
 
-    text = (
-        "📚 <b>Каталог заданий</b>\n"
-        "Выбери уровень сложности:"
+    await safe_edit_text(
+        cb.message,
+        text,
+        reply_markup=tasks_filters_kb(),
     )
-
-    # text = (
-    #     "📚 <b>Каталог заданий</b>\n"
-    #     "Выбери уровень сложности, чтобы посмотреть задания.\n\n"
-    #     "• 🟢 Лёгкие (1–5 coins)\n"
-    #     "• 🟡 Средние (5–10 coins)\n"
-    #     "• 🔴 Сложные (10–15 coins)\n"
-    # )
-    await safe_edit_text(cb.message, text, reply_markup=tasks_filters_kb(), ParseMode=ParseMode.HTML)
     await cb.answer()
 
-@router.callback_query(F.data.startswith("task:filter:"))
+
+@router.callback_query(F.data.startswith("tasks:filter:"))
 async def filter_tasks(cb: CallbackQuery):
-    diff = cb.data.split(":",)[2] #e|n or m |h
-    ranges = {"easy": (1,2), "medium": (5, 10), "hard": (10, 15)}
-    min_c, max_c = ranges.get(diff, (None, None))
+    _, _, diff = cb.data.split(":", 2)  # easy / medium / hard / all
 
-    tasks = list_tasks(min_reward=min_c, max_reward=max_c, difficulty=diff, only_published=True)
-    if not tasks:
-        await cb.message.edit_text("Пока нет заданий в этой категории.", reply_markup=tasks_filters_kb())
-        await cb.answer()
+    difficulty = diff if diff != "all" else None
+    tasks = list_public_tasks(difficulty=difficulty)
 
-        mark = "🟢" if diff == "easy" else "🟡" if diff == "medium" else "🔴"
-        await safe_edit_text(
-            cb.message,
-            f"📚 Задания {mark}\nВыбери задание:",
-            reply_markup=tasks_list_kb(tasks),
-        )
-        await cb.answer()
+    title_map = {
+        "easy": "🟢 Лёгкие задания",
+        "medium": "🟡 Средние задания",
+        "hard": "🔴 Сложные задания",
+        "all": "📚 Все задания",
+    }
+    title = title_map.get(diff, "📚 Каталог заданий")
 
+    text = render_tasks_list(tasks, title=title)
+
+    await safe_edit_text(
+        cb.message,
+        text,
+        reply_markup=tasks_filters_kb(),
+    )
+    await cb.answer()
 
 @router.callback_query(F.data.startswith("task:view:"))
 async def view_task(cb: CallbackQuery):

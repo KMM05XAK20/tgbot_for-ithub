@@ -229,8 +229,10 @@ def list_tasks(*, min_reward: int | None = None, max_reward: int | None = None,
 
 def list_public_tasks(difficulty: str | None = None) -> list[Task]:
     """
-    Задачи, которые показываем в каталоге.
+    Возвращает задачи, которые должны отображаться в каталоге.
+    difficulty: "easy" | "medium" | "hard" | "all" | None
     """
+
     with SessionLocal() as s:
         q = s.query(Task).filter(Task.is_published == True)
 
@@ -238,6 +240,7 @@ def list_public_tasks(difficulty: str | None = None) -> list[Task]:
         if difficulty and difficulty != "all":
             q = q.filter(Task.difficulty == difficulty)
 
+        q = q.filter(Task.status == "active")
         # Для стабильного порядка
         q = q.order_by(Task.id.asc())
 

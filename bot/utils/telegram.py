@@ -1,24 +1,18 @@
-from contextlib import suppress
 from aiogram.exceptions import TelegramBadRequest
-from aiogram.types import Message, InlineKeyboardMarkup
+from aiogram.types import Message
 
 
-async def safe_edit_text(
-    message: Message,
-    text: str,
-    reply_markup: InlineKeyboardMarkup | None = None,
-    **kwargs,
-):
+async def safe_edit_text(message: Message, text: str, **kwargs) -> None:
     """
-    Безопасно правим текст сообщения:
-    - игнорируем ошибку 'message is not modified'
-    - остальные пробрасываем наверх
+    Безопасно редактирует текст сообщения:
+    - если текст и разметка те же самые, Telegram кидает ошибку
+      'message is not modified' — мы её молча игнорируем
+    - все остальные ошибки пробрасываем дальше
     """
-    with suppress(TelegramBadRequest) as ctx:
-        await message.edit_text(text, reply_markup=reply_markup, **kwargs)
-
-    # если это был не 'message is not modified' — перекинем ошибку
-    if ctx.token is not None:
-        err = ctx.token
-        if "message is not modified" not in str(err):
-            raise err
+    try:
+        await message.edit_text(text, **kwargs)
+    except TelegramBadRequest as e:
+        if "message is not modified" in str(e):
+            # Просто ничего не делаем — для пользователя изменений нет
+            return
+        raise

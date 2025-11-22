@@ -240,9 +240,9 @@ def tasks_filters_kb() -> InlineKeyboardMarkup:
         InlineKeyboardButton(text="🟢 Лёгкие", callback_data="tasks:filter:easy"),
         InlineKeyboardButton(text="🟡 Средние", callback_data="tasks:filter:medium"),
         InlineKeyboardButton(text="🔴 Сложные", callback_data="tasks:filter:hard"),
-        InlineKeyboardButton(text="⬅️ В меню", callback_data="menu:open:tasks")
+        InlineKeyboardButton(text="📚 Все", callback_data="tasks:filter:all")
     )
-    kb.adjust(2)
+    kb.adjust(2, 2)
     return kb.as_markup()
 
 
