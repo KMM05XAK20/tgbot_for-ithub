@@ -380,4 +380,3 @@ async def last_users_handler(msg: Message):
 
     text = "👥 <b>Последние пользователи</b>:\n" + "\n".join(lines)
     await msg.answer(text)
-

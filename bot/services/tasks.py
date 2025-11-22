@@ -226,13 +226,27 @@ def list_tasks(*, min_reward: int | None = None, max_reward: int | None = None,
                 q = q.filter(getattr(Task, rew_f) <= max_reward)
         return q.order_by(Task.id.desc()).all()
 
+
 def list_public_tasks(difficulty: str | None = None) -> list[Task]:
+    """
+    Задачи, которые показываем в каталоге.
+    """
     with SessionLocal() as s:
-        q = s.query(Task).filter(Task.is_published.is_(True))
-        if difficulty in ("easy", "medium", "hard"):
+        q = s.query(Task).filter(Task.is_published == True)
+
+        # Если передали фильтр по сложности
+        if difficulty and difficulty != "all":
             q = q.filter(Task.difficulty == difficulty)
-        # можно ещё сортировку по reward или id
+
+        # Для стабильного порядка
+        q = q.order_by(Task.id.asc())
+
         return q.all()
+
+def debug_all_tasks() -> list[Task]:
+    with SessionLocal as s:
+        return s.query(Task).order_by(Task.id.asc()).all()
+
 def get_task(task_id: int):
     with SessionLocal() as s:
         return s.query(Task).filter(Task.id == task_id).first()
