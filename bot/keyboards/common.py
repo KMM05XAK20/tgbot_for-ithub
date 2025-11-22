@@ -1,6 +1,6 @@
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-from ..storage.models import MentorTopic
+from ..storage.models import MentorTopic, Task
 
 
 # welcome zone
@@ -257,6 +257,38 @@ def tasks_list_kb(tasks: list) -> InlineKeyboardMarkup:
     rows.append([InlineKeyboardButton(text="⬅️ Фильтры", callback_data="menu:open:tasks")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
+def tasks_catalog_kb(tasks: list[Task]) -> InlineKeyboardMarkup:
+    """
+    Клавиатура для каталога:
+    - по кнопке на каждое задание (Подробнее)
+    - снизу — фильтры по сложности
+    """
+    rows: list[list[InlineKeyboardButton]] = []
+
+    # Кнопки "Подробнее" для каждого задания
+    for t in tasks:
+        # обрежем длинные названия, чтобы клавиатура не разъезжалась
+        title_short = t.title if len(t.title) <= 30 else t.title[:27] + "..."
+        rows.append([
+            InlineKeyboardButton(
+                text=f"🔎 {title_short}",
+                callback_data=f"tasks:view:{t.id}",
+            )
+        ])
+    
+    # Ряд с фильтрами сложности
+    rows.append([
+        InlineKeyboardButton(text="🟢 Лёгкие", callback_data="tasks:filter:easy"),
+        InlineKeyboardButton(text="🟡 Средние", callback_data="tasks:filter:medium"),
+    ])
+    rows.append([
+        InlineKeyboardButton(text="🔴 Сложные", callback_data="tasks:filter:hard"),
+        InlineKeyboardButton(text="📚 Все", callback_data="tasks:filter:all"),
+    ])
+
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
 def task_submit_kb(task_id: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="📤 Сдать задание", callback_data=f"tasks:submit:{task_id}")],
@@ -275,9 +307,9 @@ def task_details_kb(task_id: int) -> InlineKeyboardMarkup:
 # def task_view_kb(task_id: int) -> InlineKeyboardMarkup:
 #     return task_details_kb(task_id)
 
-def task_view_kb(task_id: int, alredy_taken: bool = True) -> InlineKeyboardMarkup:
+def task_view_kb(task_id: int, already_taken: bool = False) -> InlineKeyboardMarkup:
     rows = []
-    if alredy_taken:
+    if already_taken:
         rows.append([InlineKeyboardButton(text="📤 Сдать задание", callback_data=f"tasks:submit:{task_id}")])
     else:
         rows.append([InlineKeyboardButton(text="✅ Взять задание", callback_data=f"tasks:take:{task_id}")])

@@ -122,17 +122,33 @@ def classify_difficulty(reward: int) -> str:
         return "hard"
 
 def get_active_assignment(user_tg_id: int, task_id: int) -> TaskAssignment | None:
+    """
+    Возвращает активное/отправленное на проверку назначение
+    для пользователя с заданным Telegram ID и task_id.
+    """
     with SessionLocal() as s:
-        user = s.execute(select(User).where(User.tg_id == user_tg_id)).scalar_one_or_none()
+        # Сначала ищем пользователя по tg_id
+        user = (
+            s.query(User)
+            .filter(User.tg_id == user_tg_id)
+            .one_or_none()
+        )
         if not user:
             return None
-        return s.execute(
-            select(TaskAssignment).where(
+
+        # Потом ищем назначение по user_id + task_id
+        assignment = (
+            s.query(TaskAssignment)
+            .filter(
                 TaskAssignment.user_id == user.id,
                 TaskAssignment.task_id == task_id,
-                TaskAssignment.status.in_(["in_progress", "submitted"])
-            ).order_by(TaskAssignment.id.desc())
-        ).scalar_one_or_none()
+                TaskAssignment.status.in_(("active", "submitted")),
+            )
+            .order_by(TaskAssignment.id.desc())
+            .first()
+        )
+
+        return assignment
 
 def submit_assignment_text(assignment_id: int, text: str) -> bool:
     with SessionLocal() as s:
@@ -254,41 +270,90 @@ def get_task(task_id: int):
     with SessionLocal() as s:
         return s.query(Task).filter(Task.id == task_id).first()
 
+
 def has_active_assignment(user_tg_id: int, task_id: int) -> bool:
     with SessionLocal() as s:
-        user = s.execute(select(User).where(User.tg_id == user_tg_id)).scalar_one_or_none()
+        user = (
+            s.query(User)
+            .filter(User.tg_id == user_tg_id)
+            .one_or_none()
+        )
         if not user:
             return False
-        exists = s.execute(
-            select(func.count(TaskAssignment.id)).where(
+
+        existing = (
+            s.query(TaskAssignment)
+            .filter(
                 TaskAssignment.user_id == user.id,
                 TaskAssignment.task_id == task_id,
-                TaskAssignment.status.in_(["in_progress", "submitted"])
+                TaskAssignment.status.in_(("active", "submitted")),
             )
-        ).scalar_one()
-        return exists > 0
+            .first()
+        )
+        return existing is not None
+
 
 def take_task(user_tg_id: int, task_id: int) -> bool:
-    """Вернёт True если удалось взять; False если уже было взято."""
+    """
+    Выдаёт пользователю задание:
+    - по Telegram ID ищем/создаём User
+    - проверяем, нет ли уже активного/отправленного на проверку Assignment
+    - создаём новый TaskAssignment со статусом 'active' и валидным due_at
+    """
     with SessionLocal() as s:
-        user = s.execute(select(User).where(User.tg_id == user_tg_id)).scalar_one_or_none()
-        task = s.get(Task, task_id)
-        if not user or not task:
-            return False
-        # запретим дубли
-        dup = s.execute(
-            select(TaskAssignment).where(
+        # 1) ищем пользователя по tg_id
+        user: User | None = (
+            s.query(User)
+            .filter(User.tg_id == user_tg_id)
+            .one_or_none()
+        )
+        if user is None:
+            user = User(tg_id=user_tg_id)
+            s.add(user)
+            s.commit()
+            s.refresh(user)
+
+        # 2) проверяем, не взял ли он уже это задание
+        existing = (
+            s.query(TaskAssignment)
+            .filter(
                 TaskAssignment.user_id == user.id,
                 TaskAssignment.task_id == task_id,
-                TaskAssignment.status.in_(["in_progress", "submitted"])
+                TaskAssignment.status.in_(("active", "submitted")),
             )
-        ).scalar_one_or_none()
-        if dup:
+            .first()
+        )
+        if existing:
             return False
-        due = datetime.utcnow() + timedelta(days=task.deadline_days or 2)
-        s.add(TaskAssignment(task_id=task.id, user_id=user.id, due_at=due))
+
+        # 3) найдём само задание
+        task: Task | None = s.query(Task).filter(Task.id == task_id).one_or_none()
+        if task is None:
+            return False
+
+        # 4) считаем дедлайн
+        taken_at = datetime.utcnow()
+
+        # если у задания есть deadline_days — добавляем,
+        # если нет — ставим дедлайн равным taken_at (или можешь сделать +7 дней, если хочешь)
+        if getattr(task, "deadline_days", None):
+            due_at = taken_at + timedelta(days=task.deadline_days)
+        else:
+            # Без дедлайна — чтобы не ломать NOT NULL, ставим равным моменту взятия
+            due_at = taken_at + timedelta(days=30)
+
+        # 5) создаём assignment
+        ta = TaskAssignment(
+            user_id=user.id,
+            task_id=task.id,
+            taken_at=taken_at,
+            due_at=due_at,
+            status="active",
+        )
+        s.add(ta)
         s.commit()
         return True
+
 
 
 def _task_field_map() -> dict[str, str | None]:
@@ -523,60 +588,70 @@ def get_assignment_card(assignment_id: int):
             "user_tg_id": u.tg_id if u else None,
         }
 
-
-def get_active_assignment(user_tg_id: int, task_id: int) -> Optional[TaskAssignment]:
-    
-    with SessionLocal() as s:
-        a = (
-            s.query(TaskAssignment)
-            .filter(TaskAssignment.user_tg_id == user_tg_id,
-                    TaskAssignment.task_id == task_id,
-                    TaskAssignment.status == "active")
-            .first()
-        )
-        return a
-
 # Отметить «взято» (если ещё не взято)
-def take_task(user_tg_id: int, task_id: int) -> bool:
+# def take_task(user_tg_id: int, task_id: int) -> bool:
+#     with SessionLocal() as s:
+#         # уже есть активное?
+#         exists = (
+#             s.query(TaskAssignment)
+#              .filter(TaskAssignment.user_tg_id == user_tg_id,
+#                      TaskAssignment.status == "active")
+#              .first()
+#         )
+#         if exists:
+#             return False
+#         # создать активную
+#         a = TaskAssignment(user_tg_id=user_tg_id, task_id=task_id, status="active", created_at=datetime.utcnow())
+#         s.add(a)
+#         s.commit()
+#         return True
+
+def submit_task(
+    user_tg_id: int,
+    task_id: int,
+    text: str | None,
+    file_id: str | None,
+) -> bool:
+    """
+    Помечает активное задание как 'submitted' и сохраняет текст/файл.
+    Ищем assignment по user_tg_id + task_id через связку User.tg_id -> TaskAssignment.user_id.
+    """
     with SessionLocal() as s:
-        # уже есть активное?
-        exists = (
-            s.query(TaskAssignment)
-             .filter(TaskAssignment.user_tg_id == user_tg_id,
-                     TaskAssignment.status == "active")
-             .first()
+        # 1) находим пользователя по Telegram ID
+        user = (
+            s.query(User)
+            .filter(User.tg_id == user_tg_id)
+            .one_or_none()
         )
-        if exists:
+        if not user:
             return False
-        # создать активную
-        a = TaskAssignment(user_tg_id=user_tg_id, task_id=task_id, status="active", created_at=datetime.utcnow())
-        s.add(a)
+
+        # 2) находим активное назначение по user_id + task_id
+        assignment = (
+            s.query(TaskAssignment)
+            .filter(
+                TaskAssignment.user_id == user.id,
+                TaskAssignment.task_id == task_id,
+                TaskAssignment.status == "active",
+            )
+            .order_by(TaskAssignment.id.desc())
+            .first()
+        )
+        if not assignment:
+            return False
+
+        # 3) записываем данные сдачи
+        if text:
+            assignment.submission_text = text
+        if file_id:
+            assignment.submission_file_id = file_id
+
+        assignment.submitted_at = datetime.utcnow()
+        assignment.status = "submitted"
+
         s.commit()
         return True
 
-# Сдача: сохраняем текст/ссылку и (опц.) file_id; статус -> submitted
-def submit_task(user_tg_id: int, task_id: int, text: str, file_id: Optional[str] = None) -> bool:
-    with SessionLocal() as s:
-        a = (
-            s.query(TaskAssignment)
-            .filter(TaskAssignment.user_tg_id == user_tg_id,
-                    TaskAssignment.task_id == task_id,
-                    TaskAssignment.status == "active")
-            .first()
-        )
-        if not a:
-            return False
-        # предполагаем, что в модели есть поля proof_text/proof_file_id; если нет — пропусти
-        if hasattr(a, "proof_text"):
-            a.proof_text = text
-        if file_id and hasattr(a, "proof_file_id"):
-            a.proof_file_id = file_id
-        a.status = "submitted"
-        if hasattr(a, "submitted_at"):
-            a.submitted_at = datetime.utcnow()
-        s.commit()
-        return True
-    
 
 # Список «на проверке» для админа
 def list_submitted_assignments(limit: int = 20) -> list[TaskAssignment]:
