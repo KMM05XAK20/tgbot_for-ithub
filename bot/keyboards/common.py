@@ -1,7 +1,7 @@
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-from ..storage.models import MentorTopic, Task
-
+from ..storage.models import MentorTopic, Task, TaskAssignment
+from typing import Sequence
 
 # welcome zone
 def welcome_kb() -> InlineKeyboardMarkup:
@@ -26,18 +26,60 @@ def admin_panel_kb() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="🧑‍🏫 Менторы", callback_data="admin:mentors")],
         [InlineKeyboardButton(text="📚 Задания", callback_data="admin:tasks")],          # если есть раздел заданий
+        [InlineKeyboardButton(text="🕒 На модерации", callback_data="admin:assignments:pending")],
         [InlineKeyboardButton(text="📣 Рассылка", callback_data="admin:broadcast")],     # если есть рассылка
         [InlineKeyboardButton(text="⬅️ В меню", callback_data="menu:open:main")],
     ])
-def admin_pending_kb(page: int) -> InlineKeyboardMarkup:
-    kb = InlineKeyboardBuilder()
-    prev_cb = f"admin:pending:{max(1, page-1)}"
-    next_cb = f"admin:pending:{page+1}"
-    kb.button(text="⬅️", callback_data=prev_cb)
-    kb.button(text="➡️", callback_data=next_cb)
-    kb.button(text="🏠 Меню", callback_data="menu:open:root")
-    kb.adjust(3)
-    return kb.as_markup()
+
+
+def admin_pending_kb(assignments: Sequence[TaskAssignment]) -> InlineKeyboardMarkup:
+    """
+    Список заданий на модерации.
+    На каждое назначение — отдельная кнопка:
+    [@username • Название задания]
+    callback_data = 'admin:assign:<assignment_id>'
+    """
+    rows: list[list[InlineKeyboardButton]] = []
+
+    for a in assignments:
+        # Пытаемся аккуратно вытащить пользователя и задание
+        user = getattr(a, "user", None)
+        task = getattr(a, "task", None)
+
+        if user and getattr(user, "username", None):
+            user_part = f"@{user.username}"
+        elif user:
+            user_part = f"user#{user.id}"
+        else:
+            user_part = "неизвестный"
+
+        if task and getattr(task, "title", None):
+            task_part = task.title
+        else:
+            task_part = f"task#{a.task_id}"
+
+        text = f"{user_part} • {task_part}"
+        # режем, чтобы не упереться в лимиты Телеги
+        if len(text) > 64:
+            text = text[:61] + "..."
+
+        rows.append([
+            InlineKeyboardButton(
+                text=text,
+                callback_data=f"admin:assign:{a.id}",
+            )
+        ])
+
+    # Кнопка "Назад в админку"
+    rows.append([
+        InlineKeyboardButton(
+            text="⬅️ Назад",
+            callback_data="admin:root",   # у тебя уже должен быть такой обработчик
+        )
+    ])
+
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
 
 def admin_grant_kb(user_id: int):
     return InlineKeyboardMarkup(inline_keyboard=[
@@ -49,14 +91,33 @@ def admin_grant_kb(user_id: int):
         ]
     ])
 
-# approve/reject --> task
-def admin_assignment_kb(aid: int) -> InlineKeyboardMarkup:
-    kb = InlineKeyboardBuilder()
-    kb.button(text="✅ Approve", callback_data=f"admin:approve:{aid}")
-    kb.button(text="❌ Reject", callback_data=f"admin:reject:{aid}")
-    kb.button(text="⬅️ Список", callback_data="admin:pending:1")
-    kb.adjust(2, 1)
-    return kb.as_markup()
+def admin_assignment_kb(assignment_id: int) -> InlineKeyboardMarkup:
+    """
+    Кнопки под конкретным назначением:
+    - Одобрить
+    - Отклонить
+    - Назад к списку
+    """
+    rows = [
+        [
+            InlineKeyboardButton(
+                text="✅ Одобрить",
+                callback_data=f"admin:assign:approve:{assignment_id}",
+            ),
+            InlineKeyboardButton(
+                text="❌ Отклонить",
+                callback_data=f"admin:assign:reject:{assignment_id}",
+            ),
+        ],
+        [
+            InlineKeyboardButton(
+                text="⬅️ К списку",
+                callback_data="admin:assignments:pending",
+            )
+        ],
+    ]
+
+    return InlineKeyboardMarkup(inline_keyboard=rows)
 
 # admin menu for mentors
 def admin_mentors_root_kb() -> InlineKeyboardMarkup:

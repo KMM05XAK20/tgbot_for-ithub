@@ -560,33 +560,126 @@ def list_assignments(user_tg_id: int, group: str, page: int = 1, per_page: int =
                 TaskAssignment.id.desc(),
             )
 
+def moderate_assignment(assignment_id: int, approved: bool) -> bool:
+    """
+    Модерация заявки:
+    - approved=True  → статус 'done', начисляем coins
+    - approved=False → статус 'rejected' (без награды)
+    """
+    with SessionLocal() as s:
+        ta: TaskAssignment | None = s.query(TaskAssignment).get(assignment_id)
+        if not ta:
+            return False
+
+        if ta.status != "submitted":
+            # Модерировать есть смысл только "на проверке"
+            return False
+
+        task: Task | None = ta.task
+        user: User | None = ta.user
+
+        if approved:
+            reward = getattr(task, "reward_coins", 0) or 0
+            if user:
+                user.coins = (user.coins or 0) + reward
+            ta.status = "done"
+        else:
+            ta.status = "rejected"
+
+        s.commit()
+        return True
+
+
 # ultil for id
 def _get(obj, name, default=None):
     return getattr(obj, name, default)
 
 
-def get_assignment_card(assignment_id: int):
+def format_dt(dt: datetime | None) -> str:
+    if not dt:
+        return "—"
+    return dt.strftime("%Y-%m-%d %H:%M")
+
+def get_assignment_card(assignment_id: int) -> str | None:
     """
-    Полная карточка для просмотра.
-    -> dict | None
+    Возвращает готовый текст для карточки назначения задания:
+    кто, какое задание, дедлайн, статус, что прислал и т.п.
     """
     with SessionLocal() as s:
-        a = s.get(TaskAssignment, assignment_id)
-        if not a:
+        ta: TaskAssignment | None = (
+            s.query(TaskAssignment)
+            .options(
+                joinedload(TaskAssignment.user),
+                joinedload(TaskAssignment.task),
+            )
+            .filter(TaskAssignment.id == assignment_id)
+            .one_or_none()
+        )
+
+        if not ta:
             return None
-        t = s.get(Task, a.task_id)
-        u = s.get(User, a.user_id)
-        return {
-            "id": a.id,
-            "status": a.status,
-            "due_at": a.due_at,
-            "submitted_at": a.submitted_at,
-            "submission_text": a.submission_text,
-            "has_file": bool(a.submission_file_id),
-            "task_title": t.title if t else "—",
-            "reward": t.reward_coins if t else 0,
-            "user_tg_id": u.tg_id if u else None,
-        }
+
+        user: User | None = ta.user
+        task: Task | None = ta.task
+
+        # --- Пользователь ---
+        if user:
+            if user.username:
+                user_line = f"👤 Пользователь: @{user.username} (tg_id={user.tg_id})"
+            else:
+                user_line = f"👤 Пользователь: id={user.id}, tg_id={user.tg_id}"
+        else:
+            user_line = "👤 Пользователь: неизвестен"
+
+        # --- Задание ---
+        if task:
+            title = task.title or f"task#{task.id}"
+            desc = task.description or "без описания"
+            reward = getattr(task, "reward_coins", None)
+            difficulty = getattr(task, "difficulty", None)
+
+            task_lines = [
+                f"📌 Задание: <b>{title}</b>",
+                f"ℹ️ Описание: {desc}",
+            ]
+            if difficulty:
+                task_lines.append(f"⭐️ Сложность: {difficulty}")
+            if reward is not None:
+                task_lines.append(f"💰 Награда: {reward} coins")
+            task_block = "\n".join(task_lines)
+        else:
+            task_block = f"📌 Задание: task_id={ta.task_id}"
+
+        # --- Даты и статус ---
+        status = ta.status or "—"
+        taken = format_dt(ta.taken_at)
+        due = format_dt(ta.due_at)
+        submitted = format_dt(ta.submitted_at)
+
+        status_block = (
+            f"📊 Статус: <b>{status}</b>\n"
+            f"📥 Взято: {taken}\n"
+            f"⏰ Дедлайн: {due}\n"
+            f"📤 Отправлено на проверку: {submitted}"
+        )
+
+        # --- Что прислал пользователь ---
+        if ta.submission_text:
+            submission_block = f"📝 Ответ:\n{ta.submission_text}"
+        elif ta.submission_file_id:
+            submission_block = "🖼 Прикреплено фото/файл."
+        else:
+            submission_block = "🕳 Пользователь ещё ничего не прислал."
+
+        text = (
+            "🔎 <b>Заявка на модерацию</b>\n\n"
+            f"{user_line}\n\n"
+            f"{task_block}\n\n"
+            f"{status_block}\n\n"
+            f"{submission_block}"
+        )
+
+        return text
 
 # Отметить «взято» (если ещё не взято)
 # def take_task(user_tg_id: int, task_id: int) -> bool:
@@ -655,14 +748,30 @@ def submit_task(
 
 # Список «на проверке» для админа
 def list_submitted_assignments(limit: int = 20) -> list[TaskAssignment]:
+    """
+    Все задания, отправленные на проверку (status='submitted'),
+    с заранее подгруженными user и task, чтобы их можно было трогать
+    после закрытия Session.
+    """
     with SessionLocal() as s:
-        return (
+        q = (
             s.query(TaskAssignment)
+            .options(
+                joinedload(TaskAssignment.user),
+                joinedload(TaskAssignment.task),
+            )
             .filter(TaskAssignment.status == "submitted")
-            .order_by(TaskAssignment.id.desc())
+            .order_by(TaskAssignment.submitted_at.desc().nullslast())
             .limit(limit)
-            .all()
         )
+        items = q.all()
+
+        # на всякий случай «потрогаем» отношения, чтобы точно прогрелись
+        for a in items:
+            _ = a.user
+            _ = a.task
+
+        return items
 
 # Апрув/реджект модератором; при апруве — начисляем монеты
 def moderate_assignment(assignment_id: int, approve: bool) -> Optional[TaskAssignment]:
@@ -677,7 +786,7 @@ def moderate_assignment(assignment_id: int, approve: bool) -> Optional[TaskAssig
 
         # начислим юзеру монеты при апруве
         if approve:
-            u = s.query(User).filter(User.tg_id == a.user_tg_id).first()
+            u = s.query(User).filter(User.tg_id == a.user_id).first()
             t = s.query(Task).filter(Task.id == a.task_id).first()
             if u and t:
                 reward = _get(t, "reward", _get(t, "coins", 0)) or 0
