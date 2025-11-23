@@ -4,6 +4,7 @@ venv/
 .env
 # базы данных
 bot.db
+backupas/server_old.db
 # pycache
 __pycache__/
 *.pyc
