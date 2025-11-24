@@ -5,6 +5,9 @@ venv/
 # базы данных
 bot.db
 backupas/server_old.db
+
+# .py files 
+test.py
 # pycache
 __pycache__/
 *.pyc
