@@ -22,8 +22,19 @@ HELP_TEXT = (
     "Команды:\n"
     "• /start — главное меню\n"
     "• /whoime — информация о твоём профиле (id, роль, админ)\n"
+    "• /help - информация о боте (аналогична кнопке 'Помощь')\n"
+    "• Чтобы сообщить об ошибках в боте писать сюда - @mkm1950\n Желательно приложить скрин"
 )
 
+
+@router.callback_query(F.data == "menu:open:help")
+async def open_help_menu(cb: CallbackQuery):
+    await cb.message.edit_text(HELP_TEXT, reply_markup=main_menu_kb())
+    await cb.answer()
+
+@router.message(Command("help"))
+async def help_command(msg: Message):
+    await msg.answer(HELP_TEXT, reply_markup=main_menu_kb())
 
 
 @router.message(Command("whoime"))
