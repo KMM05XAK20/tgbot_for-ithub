@@ -1,3 +1,4 @@
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from typing import Iterable, Optional
 from sqlalchemy import select, func, and_, or_
 from sqlalchemy.orm import Session
@@ -6,7 +7,10 @@ from .users import get_user
 from ..storage.db import SessionLocal
 from ..storage.models import Task, TaskAssignment, User
 from datetime import datetime, timedelta
+import logging
 
+
+log = logging.getLogger(__name__)
 
 def reward_to_difficulty(reward: int) -> str:
     """
@@ -121,34 +125,23 @@ def classify_difficulty(reward: int) -> str:
     else:
         return "hard"
 
+
 def get_active_assignment(user_tg_id: int, task_id: int) -> TaskAssignment | None:
     """
-    Возвращает активное/отправленное на проверку назначение
-    для пользователя с заданным Telegram ID и task_id.
+    Возвращает активное/отправленное назначение по заданию для пользователя.
     """
     with SessionLocal() as s:
-        # Сначала ищем пользователя по tg_id
-        user = (
-            s.query(User)
-            .filter(User.tg_id == user_tg_id)
-            .one_or_none()
-        )
-        if not user:
-            return None
-
-        # Потом ищем назначение по user_id + task_id
-        assignment = (
-            s.query(TaskAssignment)
-            .filter(
-                TaskAssignment.user_id == user.id,
+        stmt = (
+            select(TaskAssignment)
+            .join(User, TaskAssignment.user_id == User.id)
+            .where(
+                User.tg_id == user_tg_id,
                 TaskAssignment.task_id == task_id,
                 TaskAssignment.status.in_(("active", "submitted")),
             )
-            .order_by(TaskAssignment.id.desc())
-            .first()
         )
+        return s.execute(stmt).scalar_one_or_none()
 
-        return assignment
 
 def submit_assignment_text(assignment_id: int, text: str) -> bool:
     with SessionLocal() as s:
@@ -222,6 +215,153 @@ def seed_tasks_if_empty() -> None:
             s.add(_create_task_obj(**d))
         s.commit()
 
+def list_submitted_assignments(limit: int = 20) -> list[TaskAssignment]:
+    """Все задания в статусе 'submitted' для админской модерации."""
+    with SessionLocal() as s:
+        stmt = (
+            select(TaskAssignment)
+            .where(TaskAssignment.status == "submitted")
+            .order_by(TaskAssignment.id.desc())
+            .limit(limit)
+        )
+        res = s.execute(stmt)
+        items = [row[0] for row in res.all()]
+        # подгружаем связки task/user, чтобы потом можно было их показать
+        for ta in items:
+            _ = ta.task
+            _ = ta.user
+        return items
+
+def get_assignment_card(assignment_id: int) -> tuple[str, InlineKeyboardMarkup] | None:
+    """Собирает текст и клавиатуру для одной заявки на модерации."""
+    with SessionLocal() as s:
+        ta = s.get(TaskAssignment, assignment_id)
+        if not ta:
+            return None
+
+        task = ta.task
+        user = ta.user
+
+        title = task.title if task else f"Задание #{ta.task_id}"
+        desc = (task.description or "").strip() if task and task.description else "—"
+        uname = f"@{user.username}" if user and user.username else str(getattr(user, "tg_id", ta.user_id))
+
+        status = ta.status
+        submitted_at = ta.submitted_at.strftime("%Y-%m-%d %H:%M") if ta.submitted_at else "—"
+
+        text = (
+            f"📝 <b>{title}</b>\n"
+            f"👤 Участник: {uname}\n"
+            f"📌 Статус: <b>{status}</b>\n"
+            f"⏱ Отправлено: {submitted_at}\n\n"
+            f"<b>Описание задания:</b>\n{desc}\n\n"
+        )
+
+        if ta.submission_text:
+            text += f"<b>Ответ:</b>\n{ta.submission_text}\n\n"
+
+        if ta.submission_file_id:
+            text += "📎 Есть прикреплённый файл (фото/документ).\n\n"
+
+        kb = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    InlineKeyboardButton(
+                        text="✅ Одобрить",
+                        callback_data=f"admin:assign:approve:{ta.id}",
+                    ),
+                    InlineKeyboardButton(
+                        text="❌ Отклонить",
+                        callback_data=f"admin:assign:reject:{ta.id}",
+                    ),
+                ],
+                [
+                    InlineKeyboardButton(
+                        text="⬅️ Назад к списку",
+                        callback_data="admin:assignments:pending",
+                    )
+                ],
+            ]
+        )
+
+        return text, kb
+
+# калькулятор начисления баллов
+def calc_reward_for_task(task: Task | None) -> int:
+    if task is None:
+        return 0
+    if getattr(task, "reward_coins", None) is not None:
+        return int(task.reward_coins)
+    # цена сложностей
+    diff_reward_map = {"easy":3, "medium":7, "hard":12}
+    return diff_reward_map(getattr(task, "difficulty", ""), 0)
+
+
+
+def moderate_assignment(assignment_id: int, approved: bool) -> int:
+    """
+    Модерация сдачи задания.
+    :return: сколько coins начислили (0, если отклонено или ошибка)
+    """
+    with SessionLocal() as s:
+        ta = s.get(TaskAssignment, assignment_id)
+        if not ta:
+            log.warning("moderate_assignment: assignment %s not found", assignment_id)
+            return 0
+
+        # чтобы не начислить второй раз
+        if ta.status in ("approved", "done", "rejected"):
+            log.warning(
+                "moderate_assignment: assignment %s already moderated with status=%s",
+                assignment_id,
+                ta.status,
+            )
+            return 0
+
+        user = ta.user
+        if not user:
+            user = s.get(User, ta.user_id) if ta.user_id else None
+        if not user:
+            log.error(
+                "moderate_assignment: user not found for assignment %s (user_id=%s)",
+                assignment_id,
+                ta.user_id,
+            )
+            return 0
+
+        if not approved:
+            ta.status = "rejected"
+            s.commit()
+            log.info(
+                "moderate_assignment: REJECT assignment %s for user %s",
+                assignment_id,
+                user.tg_id,
+            )
+            return 0
+
+        # считаем награду
+        reward = calc_reward_for_task(ta.task)
+
+        before = user.coins or 0
+        after = before + reward
+        user.coins = after
+
+        ta.status = "approved"
+        ta.checked_at = datetime.utcnow() if hasattr(ta, "checked_at") else None
+
+        s.commit()
+
+        log.info(
+            "moderate_assignment: APPROVE assignment %s, user %s coins %s -> %s (reward=%s)",
+            assignment_id,
+            user.tg_id,
+            before,
+            after,
+            reward,
+        )
+        return reward
+
+
 
 def list_tasks(*, min_reward: int | None = None, max_reward: int | None = None,
                difficulty: str | None = None, only_published: bool = True):
@@ -272,81 +412,102 @@ def get_task(task_id: int):
 
 
 def has_active_assignment(user_tg_id: int, task_id: int) -> bool:
+    """
+    Есть ли у пользователя АКТИВНОЕ/ОТПРАВЛЕННОЕ на проверку задание с этим task_id.
+    approved/rejected — НЕ считаем активным.
+    """
+
+    print(f"[DEBUG has_active_assignment] user_tg_id={user_tg_id}, task_id={task_id}")
+
     with SessionLocal() as s:
         user = (
             s.query(User)
             .filter(User.tg_id == user_tg_id)
-            .one_or_none()
+            .first()
         )
         if not user:
+            print("[DEBUG has_active_assignment] user not found")
             return False
 
-        existing = (
+
+        q = (
             s.query(TaskAssignment)
             .filter(
                 TaskAssignment.user_id == user.id,
                 TaskAssignment.task_id == task_id,
                 TaskAssignment.status.in_(("active", "submitted")),
             )
-            .first()
         )
-        return existing is not None
+
+        exists = s.query(q.exists()).scalar()
+        print("[DEBUG has_active_assignment] exists={exists}")
+        return exists
+
+    # with SessionLocal() as s:
+    #     user = (
+    #         s.query(User)
+    #         .filter(User.tg_id == user_tg_id)
+    #         .one_or_none()
+    #     )
+    #     if not user:
+    #         return False
+
+    #     existing = (
+    #         s.query(TaskAssignment)
+    #         .filter(
+    #             TaskAssignment.user_id == user.id,
+    #             TaskAssignment.task_id == task_id,
+    #             TaskAssignment.status.in_(("active", "submitted")),
+    #         )
+    #         .first()
+    #     )
+    #     return existing is not None
 
 
 def take_task(user_tg_id: int, task_id: int) -> bool:
     """
-    Выдаёт пользователю задание:
-    - по Telegram ID ищем/создаём User
-    - проверяем, нет ли уже активного/отправленного на проверку Assignment
-    - создаём новый TaskAssignment со статусом 'active' и валидным due_at
+    Пользователь берёт задание.
+    Создаём TaskAssignment в статусе active, если ещё не было активного.
     """
     with SessionLocal() as s:
-        # 1) ищем пользователя по tg_id
-        user: User | None = (
-            s.query(User)
-            .filter(User.tg_id == user_tg_id)
-            .one_or_none()
+        # ищем / создаём пользователя
+        user = (
+            s.execute(select(User).where(User.tg_id == user_tg_id))
+            .scalar_one_or_none()
         )
-        if user is None:
+        if not user:
             user = User(tg_id=user_tg_id)
             s.add(user)
-            s.commit()
-            s.refresh(user)
+            s.flush()  # чтобы появился user.id
 
-        # 2) проверяем, не взял ли он уже это задание
-        existing = (
-            s.query(TaskAssignment)
-            .filter(
-                TaskAssignment.user_id == user.id,
-                TaskAssignment.task_id == task_id,
-                TaskAssignment.status.in_(("active", "submitted")),
+        task = s.get(Task, task_id)
+        if not task:
+            log.warning("take_task: task %s not found", task_id)
+            return False
+
+        # если есть активное/submitted назначение — не создаём ещё одно
+        exists = (
+            s.execute(
+                select(TaskAssignment).where(
+                    TaskAssignment.user_id == user.id,
+                    TaskAssignment.task_id == task_id,
+                    TaskAssignment.status.in_(("active", "submitted")),
+                )
             )
-            .first()
+            .scalar_one_or_none()
         )
-        if existing:
+        if exists:
             return False
 
-        # 3) найдём само задание
-        task: Task | None = s.query(Task).filter(Task.id == task_id).one_or_none()
-        if task is None:
-            return False
+        # выставляем дедлайн в днях
+        days = task.deadline_days or 1
+        now = datetime.utcnow()
+        due_at = now + timedelta(days=days)
 
-        # 4) считаем дедлайн
-        taken_at = datetime.utcnow()
-
-        # если у задания есть deadline_days — добавляем,
-        # если нет — ставим дедлайн равным taken_at (или можешь сделать +7 дней, если хочешь)
-        if getattr(task, "deadline_days", None):
-            due_at = taken_at + timedelta(days=task.deadline_days)
-        else:
-            # Без дедлайна — чтобы не ломать NOT NULL, ставим равным моменту взятия
-            due_at = taken_at + timedelta(days=30)
-
-        # 5) создаём assignment
         ta = TaskAssignment(
+            task_id=task_id,
             user_id=user.id,
-            task_id=task.id,
-            taken_at=taken_at,
+            taken_at=now,
             due_at=due_at,
             status="active",
         )
@@ -600,6 +761,7 @@ def format_dt(dt: datetime | None) -> str:
         return "—"
     return dt.strftime("%Y-%m-%d %H:%M")
 
+
 def get_assignment_card(assignment_id: int) -> str | None:
     """
     Возвращает готовый текст для карточки назначения задания:
@@ -706,44 +868,66 @@ def submit_task(
     file_id: str | None,
 ) -> bool:
     """
-    Помечает активное задание как 'submitted' и сохраняет текст/файл.
-    Ищем assignment по user_tg_id + task_id через связку User.tg_id -> TaskAssignment.user_id.
+    Сдать задание:
+    - Находим юзера по tg_id
+    - Берём последнее НЕфинальное назначение по этой задаче
+      (status IN ('active', 'submitted', 'taken'))
+    - Обновляем текст/файл, submitted_at, статус -> 'submitted'
     """
-    with SessionLocal() as s:
-        # 1) находим пользователя по Telegram ID
-        user = (
-            s.query(User)
-            .filter(User.tg_id == user_tg_id)
-            .one_or_none()
+    if not text and not file_id:
+        print("[submit_task] Neither text nor file_id provided")
+        return False
+
+    with SessionLocal() as session:
+        # 1) юзер по tg_id
+        user = session.scalar(
+            select(User).where(User.tg_id == user_tg_id)
         )
         if not user:
+            print(f"[submit_task] No user found with tg_id={user_tg_id}")
             return False
 
-        # 2) находим активное назначение по user_id + task_id
-        assignment = (
-            s.query(TaskAssignment)
-            .filter(
+        # 2) ищем последнее НЕфинальное назначение
+        non_final_statuses = ("active", "submitted", "taken")
+        assignment = session.scalar(
+            select(TaskAssignment)
+            .where(
                 TaskAssignment.user_id == user.id,
                 TaskAssignment.task_id == task_id,
-                TaskAssignment.status == "active",
+                TaskAssignment.status.in_(non_final_statuses),
             )
             .order_by(TaskAssignment.id.desc())
-            .first()
         )
+
         if not assignment:
+            print(
+                f"[submit_task] No active assignment for user_id={user.id}, task_id={task_id}"
+            )
+            return False
+        
+        if assignment.status in ("approved", "rejected"):
+            print(
+                f"[submit_task] Latest assignment {assignment.id} alredy final"
+                f"({assignment.status}, cannot submit)"
+            )
             return False
 
-        # 3) записываем данные сдачи
-        if text:
-            assignment.submission_text = text
-        if file_id:
-            assignment.submission_file_id = file_id
-
+        # 3) Обновляем сдачу
+        assignment.submission_text = text
+        assignment.submission_file_id = file_id
         assignment.submitted_at = datetime.utcnow()
         assignment.status = "submitted"
 
-        s.commit()
-        return True
+        try:
+            session.commit()
+            print(
+                f"[submit_task] OK: assignment_id={assignment.id} marked as submitted"
+            )
+            return True
+        except Exception as e:
+            session.rollback()
+            print(f"[submit_task] ERROR on commit: {e}")
+            return False
 
 
 # Список «на проверке» для админа

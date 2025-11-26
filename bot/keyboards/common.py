@@ -1,7 +1,9 @@
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from ..storage.models import MentorTopic, Task, TaskAssignment
+from ..storage.db import SessionLocal
 from typing import Sequence
+from datetime import datetime
 
 # welcome zone
 def welcome_kb() -> InlineKeyboardMarkup:
@@ -18,6 +20,7 @@ def main_menu_kb() -> InlineKeyboardMarkup:
         [InlineKeyboardButton(text="🏆 Рейтинг", callback_data="menu:open:rating")],
         [InlineKeyboardButton(text="🤝 Менторство", callback_data="menu:open:mentorship")],
         [InlineKeyboardButton(text="🗓 Календарь", callback_data="menu:open:calendar")],
+        [InlineKeyboardButton(text="⚙️ Помощь", callback_data="menu:open:help")],
         [InlineKeyboardButton(text="⬅️ В начало", callback_data="menu:open:start")],
     ])
 
@@ -318,37 +321,30 @@ def tasks_list_kb(tasks: list) -> InlineKeyboardMarkup:
     rows.append([InlineKeyboardButton(text="⬅️ Фильтры", callback_data="menu:open:tasks")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
-def tasks_catalog_kb(tasks: list[Task]) -> InlineKeyboardMarkup:
+def tasks_catalog_kb(tasks: list) -> InlineKeyboardMarkup:
     """
-    Клавиатура для каталога:
-    - по кнопке на каждое задание (Подробнее)
-    - снизу — фильтры по сложности
+    Клавиатура со СПИСКОМ заданий для пользователя.
+    Здесь только переход к просмотру задачи.
     """
     rows: list[list[InlineKeyboardButton]] = []
 
-    # Кнопки "Подробнее" для каждого задания
     for t in tasks:
-        # обрежем длинные названия, чтобы клавиатура не разъезжалась
-        title_short = t.title if len(t.title) <= 30 else t.title[:27] + "..."
+        title = t.title or "Без названия"
         rows.append([
             InlineKeyboardButton(
-                text=f"🔎 {title_short}",
-                callback_data=f"tasks:view:{t.id}",
+                text=title,
+                callback_data=f"tasks:view:{t.id}",   # ВАЖНО: view, не submit!
             )
         ])
-    
-    # Ряд с фильтрами сложности
+
     rows.append([
-        InlineKeyboardButton(text="🟢 Лёгкие", callback_data="tasks:filter:easy"),
-        InlineKeyboardButton(text="🟡 Средние", callback_data="tasks:filter:medium"),
-    ])
-    rows.append([
-        InlineKeyboardButton(text="🔴 Сложные", callback_data="tasks:filter:hard"),
-        InlineKeyboardButton(text="📚 Все", callback_data="tasks:filter:all"),
+        InlineKeyboardButton(
+            text="⬅️ Назад в меню",
+            callback_data="menu:open:main",
+        )
     ])
 
     return InlineKeyboardMarkup(inline_keyboard=rows)
-
 
 def task_submit_kb(task_id: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
@@ -368,14 +364,35 @@ def task_details_kb(task_id: int) -> InlineKeyboardMarkup:
 # def task_view_kb(task_id: int) -> InlineKeyboardMarkup:
 #     return task_details_kb(task_id)
 
-def task_view_kb(task_id: int, already_taken: bool = False) -> InlineKeyboardMarkup:
-    rows = []
-    if already_taken:
-        rows.append([InlineKeyboardButton(text="📤 Сдать задание", callback_data=f"tasks:submit:{task_id}")])
+def task_view_kb(task_id: int, already_taken: bool) -> InlineKeyboardMarkup:
+    """
+    Клавиатура под карточкой задания:
+    - если задание ещё не взято -> кнопка «Взять задание»
+    - если уже есть активное/отправленное назначение -> кнопка «Сдать задание»
+    """
+    rows: list[list[InlineKeyboardButton]] = []
+
+    if not already_taken:
+        rows.append([
+            InlineKeyboardButton(
+                text="✅ Взять задание",
+                callback_data=f"tasks:take:{task_id}",
+            )
+        ])
     else:
-        rows.append([InlineKeyboardButton(text="✅ Взять задание", callback_data=f"tasks:take:{task_id}")])
-    
-    rows.append([InlineKeyboardButton(text="⬅️ К списку", callback_data="menu:open:tasks")])
+        rows.append([
+            InlineKeyboardButton(
+                text="📤 Сдать задание",
+                callback_data=f"tasks:submit:{task_id}",
+            )
+        ])
+
+    rows.append([
+        InlineKeyboardButton(
+            text="⬅️ К каталогу",
+            callback_data="menu:open:tasks",
+        )
+    ])
 
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
@@ -413,3 +430,58 @@ def calendar_kb() -> InlineKeyboardMarkup:
     kb.add(InlineKeyboardButton(text="⬅️ Назад", callback_data="menu:open:profile"))
     kb.adjust(2)
     return kb.as_markup()
+
+
+def get_assignment_card(assignment_id: int) -> tuple[str, InlineKeyboardMarkup] | None:
+    """Собирает текст и клавиатуру для одной заявки на модерации."""
+    with SessionLocal() as s:
+        ta = s.get(TaskAssignment, assignment_id)
+        if not ta:
+            return None
+
+        task = ta.task
+        user = ta.user
+
+        title = task.title if task else f"Задание #{ta.task_id}"
+        desc = (task.description or "").strip() if task and task.description else "—"
+        uname = f"@{user.username}" if user and user.username else str(getattr(user, "tg_id", ta.user_id))
+
+        status = ta.status
+        submitted_at = ta.submitted_at.strftime("%Y-%m-%d %H:%M") if ta.submitted_at else "—"
+
+        text = (
+            f"📝 <b>{title}</b>\n"
+            f"👤 Участник: {uname}\n"
+            f"📌 Статус: <b>{status}</b>\n"
+            f"⏱ Отправлено: {submitted_at}\n\n"
+            f"<b>Описание задания:</b>\n{desc}\n\n"
+        )
+
+        if ta.submission_text:
+            text += f"<b>Ответ:</b>\n{ta.submission_text}\n\n"
+
+        if ta.submission_file_id:
+            text += "📎 Есть прикреплённый файл (фото/документ).\n\n"
+
+        kb = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    InlineKeyboardButton(
+                        text="✅ Одобрить",
+                        callback_data=f"admin:assign:approve:{ta.id}",
+                    ),
+                    InlineKeyboardButton(
+                        text="❌ Отклонить",
+                        callback_data=f"admin:assign:reject:{ta.id}",
+                    ),
+                ],
+                [
+                    InlineKeyboardButton(
+                        text="⬅️ Назад к списку",
+                        callback_data="admin:assignments:pending",
+                    )
+                ],
+            ]
+        )
+
+        return text, kb

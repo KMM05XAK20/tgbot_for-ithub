@@ -71,107 +71,74 @@ async def admin_assignments_pending(cb: CallbackQuery):
     )
     await cb.answer()
 
+@router.callback_query(F.data.startswith("admin:assign:open:"))
+async def admin_open_assignment(cb: CallbackQuery):
+    try:
+        assignment_id = int(cb.data.split(":")[-1])
+    except ValueError:
+        await cb.answer("Неверный формат callback.", show_alert=True)
+        return
+
+    card = get_assignment_card(assignment_id)
+    if not card:
+        await cb.answer("Заявка не найдена.", show_alert=True)
+        return
+
+    text, kb = card
+    await cb.message.edit_text(text, reply_markup=kb)
+    await cb.answer()
+
+
 @router.callback_query(F.data.startswith("admin:assign:approve:"))
 async def admin_approve_assignment(cb: CallbackQuery):
-    """
-    Одобрить заявку: admin:assign:approve:<assignment_id>
-    """
-    parts = cb.data.split(":")
-    if len(parts) != 4:
-        await cb.answer("Некорректный callback для approve.", show_alert=True)
-        return
-
     try:
-        assignment_id = int(parts[3])
+        assignment_id = int(cb.data.split(":")[-1])
     except ValueError:
-        await cb.answer("Некорректный ID заявки.", show_alert=True)
+        await cb.answer("Неверный формат callback.", show_alert=True)
         return
 
-    ok = moderate_assignment(assignment_id, approve=True)
-    if not ok:
-        await cb.answer("Не удалось одобрить заявку.", show_alert=True)
+    reward = moderate_assignment(assignment_id, approved=True)
+    if reward <= 0:
+        await cb.answer("Не удалось одобрить (возможно, уже обработано).", show_alert=True)
         return
 
-    await cb.answer("✅ Заявка одобрена, монеты начислены.")
+    await cb.answer(f"✅ Одобрено, +{reward} coins начислено.")
 
-    # Обновим список "на модерации"
     items = list_submitted_assignments(limit=20)
     if not items:
         await cb.message.edit_text(
-            "📭 Больше нет заданий на проверке.",
+            "📭 Больше нет заданий на модерации.",
             reply_markup=admin_tasks_root_kb(),
         )
     else:
         await cb.message.edit_text(
-            "🕒 Задания на модерации:",
+            "🕒 <b>Задания на модерации</b>\nВыберите заявку из списка:",
             reply_markup=admin_pending_kb(items),
         )
 
-
 @router.callback_query(F.data.startswith("admin:assign:reject:"))
 async def admin_reject_assignment(cb: CallbackQuery):
-    """
-    Отклонить заявку: admin:assign:reject:<assignment_id>
-    """
-    parts = cb.data.split(":")
-    if len(parts) != 4:
-        await cb.answer("Некорректный callback для reject.", show_alert=True)
-        return
-
     try:
-        assignment_id = int(parts[3])
+        assignment_id = int(cb.data.split(":")[-1])
     except ValueError:
-        await cb.answer("Некорректный ID заявки.", show_alert=True)
+        await cb.answer("Неверный формат callback.", show_alert=True)
         return
 
-    ok = moderate_assignment(assignment_id, approve=False)
-    if not ok:
-        await cb.answer("Не удалось отклонить заявку.", show_alert=True)
-        return
-
+    _ = moderate_assignment(assignment_id, approved=False)
     await cb.answer("❌ Заявка отклонена.")
 
     items = list_submitted_assignments(limit=20)
     if not items:
         await cb.message.edit_text(
-            "📭 Больше нет заданий на проверке.",
+            "📭 Больше нет заданий на модерации.",
             reply_markup=admin_tasks_root_kb(),
         )
     else:
         await cb.message.edit_text(
-            "🕒 Задания на модерации:",
+            "🕒 <b>Задания на модерации</b>\nВыберите заявку из списка:",
             reply_markup=admin_pending_kb(items),
         )
 
-
-@router.callback_query(F.data.startswith("admin:assign:"))
-async def admin_open_assignment(cb: CallbackQuery):
-    """
-    Открыть конкретную заявку на модерацию по assignment_id.
-    callback_data приходит в формате: admin:assign:<id>
-    """
-    parts = cb.data.split(":")
-    if len(parts) != 3:
-        await cb.answer()
-        return
-
-    try:
-        assignment_id = int(parts[2])
-    except ValueError:
-        await cb.answer("Некорректный ID назначения.", show_alert=True)
-        return
-
-    # Текст карточки: кто, какое задание, текст/фото, дедлайн и т.п.
-    card = get_assignment_card(assignment_id)
-    if not card:
-        await cb.answer("Назначение не найдено.", show_alert=True)
-        return
-
-    await cb.message.edit_text(
-        card,
-        reply_markup=admin_assignment_kb(assignment_id),
-    )
-    await cb.answer()
 
 # Засеять демо
 @router.callback_query(IsAdmin(), F.data == "admin:tasks:seed")

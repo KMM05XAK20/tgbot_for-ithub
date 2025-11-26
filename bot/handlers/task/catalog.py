@@ -2,13 +2,12 @@ from aiogram import Router, F
 from aiogram.types import CallbackQuery
 from aiogram.enums import ParseMode
 from ...services.tasks import list_tasks, list_public_tasks, get_task, take_task,  has_active_assignment, seed_tasks_if_empty, get_active_assignment
-from ...keyboards.common import tasks_filters_kb, tasks_catalog_kb, task_view_kb, tasks_list_kb, task_details_kb, main_menu_kb
+from ...keyboards.common import tasks_filters_kb, tasks_catalog_kb, task_view_kb, task_details_kb, main_menu_kb
 from ...utils.telegram import safe_edit_text
 from ...storage.models import Task
 
 
 router = Router(name="tasks_catalog")
-
 
 
 def render_tasks_list(tasks: list[Task], title: str = "📚 Каталог заданий") -> str:
@@ -83,23 +82,24 @@ def render_task_card(t: Task) -> str:
 async def open_tasks_root(cb: CallbackQuery):
     tasks = list_public_tasks(difficulty="all")
     text = render_tasks_list(tasks, title="📚 Каталог заданий")
+    kb = tasks_catalog_kb(tasks)
 
     await safe_edit_text(
         cb.message,
         text,
-        reply_markup=tasks_catalog_kb(tasks),
+        reply_markup=kb,
+        parse_mode=ParseMode.HTML
     )
     await cb.answer()
 
+
 @router.callback_query(F.data.startswith("tasks:view:"))
 async def open_task_details(cb: CallbackQuery):
-    """
-    Открыть полную карточку задания по клику на кнопку в каталоге.
-    """
+    # callback вида: tasks:open:2
     try:
         task_id = int(cb.data.split(":")[2])
-    except (IndexError, ValueError):
-        await cb.answer("Некорректный ID задания.", show_alert=True)
+    except (ValueError, IndexError):
+        await cb.answer("Неверный формат callback.", show_alert=True)
         return
 
     t = get_task(task_id)
@@ -107,13 +107,25 @@ async def open_task_details(cb: CallbackQuery):
         await cb.answer("Задание не найдено.", show_alert=True)
         return
 
-    text = render_task_card(t)
+    # вот тут решаем, что показывать — «Взять» или «Сдать»
     already = has_active_assignment(cb.from_user.id, task_id)
+
+    desc = (t.description or "").strip() if t.description else "—"
+    difficulty = getattr(t, "difficulty", None) or "—"
+    reward = t.reward_coins or 0
+
+    text = (
+        f"📌 <b>{t.title}</b>\n"
+        f"🧩 Сложность: <b>{difficulty}</b>\n"
+        f"💰 Награда: <b>{reward} coins</b>\n\n"
+        f"<b>Описание:</b>\n{desc}"
+    )
 
     await safe_edit_text(
         cb.message,
         text,
         reply_markup=task_view_kb(task_id, already_taken=already),
+        parse_mode=ParseMode.HTML,
     )
     await cb.answer()
 
@@ -260,9 +272,6 @@ async def take_task_cb(cb: CallbackQuery):
         await cb.answer("Задание не найдено.", show_alert=True)
         return
 
-    # Перерисуем карточку — теперь задание уже взято
-    from .catalog import render_task_card  # или выше импортируй, если удобнее
-
     text = render_task_card(t)
 
     await safe_edit_text(
@@ -271,6 +280,12 @@ async def take_task_cb(cb: CallbackQuery):
         reply_markup=task_view_kb(task_id, already_taken=True),
     )
     await cb.answer("Задание добавлено в твои активные ✅")
+
+# @router.callback_query()
+# async def debug_all_callback(cb: CallbackQuery):
+#     print(f"[DEBUG TASK CALLBACK] {cb.data}")
+#     await cb.answer()
+
 
 # @router.callback_query(F.data.startswith("tasks:take:"))
 # async def take_task_cb(cb: CallbackQuery):
