@@ -27,22 +27,31 @@ def render_tasks_list(tasks: list[Task], title: str = "📚 Каталог за�
     lines: list[str] = [title, ""]
 
     for t in tasks:
+        diff_code = getattr(t, "difficulty", None)
+        diff_human = diff_labels.get(diff_code, "⚪️ Без метки")
+
         reward = getattr(t, "reward_coins", None) or 0
         dd = getattr(t, "deadline_days", None)
         deadline_part = f"\n  ⏱ Дедлайн: {dd} дн." if dd else ""
 
-        diff_code = getattr(t, "difficulty", None)
-        diff_human = diff_labels.get(diff_code, "⚪️ Без метки")
-
         lines.append(
-            f"• <b>{t.title}</b>\n"
-            f"  🎯 Сложность: {diff_human}\n"
+            f"• <b>{diff_human}</b>\n"
+            f"  🎯 Сложность: {t.title}\n"
             f"  💰 Награда: {reward} coins"
             f"{deadline_part}\n"
             f"  ID: {t.id}"
         )
 
     return "\n\n".join(lines)
+
+def difficulty_label(diff: str | None) -> str:
+    mapping = {
+    "easy": "🟢 Лёгкое",
+    "medium": "🟡 Среднее",
+    "hard": "🔴 Сложное",
+    }
+
+    return mapping.get((diff or "").lower(), "⚪ Без категории")
 
 def render_task_card(t: Task) -> str:
     """
