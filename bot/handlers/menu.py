@@ -1,5 +1,6 @@
 from aiogram import Router, F
-from aiogram.types import CallbackQuery
+from aiogram.types import CallbackQuery, Message
+from aiogram.fsm.context import FSMContext
 from aiogram.filters import Command
 from ..keyboards.common import main_menu_kb
 
@@ -25,3 +26,8 @@ async def on_menu_open(cb: CallbackQuery):
     text = SECTION_TEXTS.get(section, "Раздел в разработке.")
     await cb.message.edit_text(text + "\n\n⬅️ Вернуться в главное меню:", reply_markup=main_menu_kb())
     await cb.answer()
+
+@router.message(Command("cancel"))
+async def cancel_any(message:Message, state:FSMContext):
+    await state.clear()
+    await message.answer("Отменил. Возвращаю в главное меню", reply_markup=main_menu_kb)

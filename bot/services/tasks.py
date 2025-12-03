@@ -232,60 +232,6 @@ def list_submitted_assignments(limit: int = 20) -> list[TaskAssignment]:
             _ = ta.user
         return items
 
-def get_assignment_card(assignment_id: int) -> tuple[str, InlineKeyboardMarkup] | None:
-    """Собирает текст и клавиатуру для одной заявки на модерации."""
-    with SessionLocal() as s:
-        ta = s.get(TaskAssignment, assignment_id)
-        if not ta:
-            return None
-
-        task = ta.task
-        user = ta.user
-
-        title = task.title if task else f"Задание #{ta.task_id}"
-        desc = (task.description or "").strip() if task and task.description else "—"
-        uname = f"@{user.username}" if user and user.username else str(getattr(user, "tg_id", ta.user_id))
-
-        status = ta.status
-        submitted_at = ta.submitted_at.strftime("%Y-%m-%d %H:%M") if ta.submitted_at else "—"
-
-        text = (
-            f"📝 <b>{title}</b>\n"
-            f"👤 Участник: {uname}\n"
-            f"📌 Статус: <b>{status}</b>\n"
-            f"⏱ Отправлено: {submitted_at}\n\n"
-            f"<b>Описание задания:</b>\n{desc}\n\n"
-        )
-
-        if ta.submission_text:
-            text += f"<b>Ответ:</b>\n{ta.submission_text}\n\n"
-
-        if ta.submission_file_id:
-            text += "📎 Есть прикреплённый файл (фото/документ).\n\n"
-
-        kb = InlineKeyboardMarkup(
-            inline_keyboard=[
-                [
-                    InlineKeyboardButton(
-                        text="✅ Одобрить",
-                        callback_data=f"admin:assign:approve:{ta.id}",
-                    ),
-                    InlineKeyboardButton(
-                        text="❌ Отклонить",
-                        callback_data=f"admin:assign:reject:{ta.id}",
-                    ),
-                ],
-                [
-                    InlineKeyboardButton(
-                        text="⬅️ Назад к списку",
-                        callback_data="admin:assignments:pending",
-                    )
-                ],
-            ]
-        )
-
-        return text, kb
-
 # калькулятор начисления баллов
 def calc_reward_for_task(task: Task | None) -> int:
     if task is None:
@@ -634,28 +580,6 @@ def get_assignment_full(assignment_id: int):
             .get(assignment_id)
         return a
 
-def approve_assignment(assignment_id: int) -> bool:
-    with SessionLocal() as s:
-        a = s.get(TaskAssignment, assignment_id)
-        if not a or a.status not in ("submitted", "in_progress"):
-            return False
-        t = s.get(Task, a.task_id)
-        u = s.get(User, a.user_id)
-        a.status = "approved"
-        # начислить монеты
-        u.coins = (u.coins or 0) + (t.reward_coins or 0)
-        s.commit()
-        return True
-
-def reject_assignment(assignment_id: int) -> bool:
-    with SessionLocal() as s:
-        a = s.get(TaskAssignment, assignment_id)
-        if not a or a.status not in ("submitted", "in_progress"):
-            return False
-        a.status = "rejected"
-        s.commit()
-        return True
-    
 def count_assignments_by_status(user_tg_id: int) -> dict[str, int]:
     """
     Возвращает количество по группам: active/submitted/done
@@ -843,23 +767,178 @@ def get_assignment_card(assignment_id: int) -> str | None:
 
         return text
 
-# Отметить «взято» (если ещё не взято)
-# def take_task(user_tg_id: int, task_id: int) -> bool:
-#     with SessionLocal() as s:
-#         # уже есть активное?
-#         exists = (
-#             s.query(TaskAssignment)
-#              .filter(TaskAssignment.user_tg_id == user_tg_id,
-#                      TaskAssignment.status == "active")
-#              .first()
-#         )
-#         if exists:
-#             return False
-#         # создать активную
-#         a = TaskAssignment(user_tg_id=user_tg_id, task_id=task_id, status="active", created_at=datetime.utcnow())
-#         s.add(a)
-#         s.commit()
-#         return True
+def list_pending_assignments(limit: int = 20) -> list[dict]:
+    """
+    Вернуть последние N заданий в статусе 'submitted'
+    в виде простых dict'ов (чтобы не ловить DetachedInstanceError).
+    """
+    with SessionLocal() as s:
+        rows = (
+            s.query(TaskAssignment, Task, User)
+            .join(Task, Task.id == TaskAssignment.task_id)
+            .join(User, User.id == TaskAssignment.user_id)
+            .filter(TaskAssignment.status == "submitted")
+            .order_by(TaskAssignment.id.desc())
+            .limit(limit)
+            .all()
+        )
+
+        items: list[dict] = []
+        for assign, task, user in rows:
+            items.append(
+                {
+                    "id": assign.id,
+                    "task_id": assign.task_id,
+                    "task_title": task.title,
+                    "user_id": assign.user_id,
+                    "user_tg_id": user.tg_id,
+                    "user_username": user.username,
+                    "status": assign.status,
+                    "taken_at": assign.taken_at,
+                    "submitted_at": assign.submitted_at,
+                    "submission_text": assign.submission_text,
+                    "submission_file_id": assign.submission_file_id,
+                    "reward": task.reward_coins or 0,
+                }
+            )
+
+        log.debug("[pending_assignments] %d items", len(items))
+        return items
+
+
+def get_assignment_for_moderation(assignment_id: int) -> dict | None:
+    """
+    Достать одно конкретное задание для экрана проверки.
+    """
+    with SessionLocal() as s:
+        row = (
+            s.query(TaskAssignment, Task, User)
+            .join(Task, Task.id == TaskAssignment.task_id)
+            .join(User, User.id == TaskAssignment.user_id)
+            .filter(TaskAssignment.id == assignment_id)
+            .one_or_none()
+        )
+
+        if row is None:
+            log.warning("[get_assignment_for_moderation] not found id=%s", assignment_id)
+            return None
+
+        assign, task, user = row
+        return {
+            "id": assign.id,
+            "task_id": assign.task_id,
+            "task_title": task.title,
+            "user_id": assign.user_id,
+            "user_tg_id": user.tg_id,
+            "user_username": user.username,
+            "status": assign.status,
+            "taken_at": assign.taken_at,
+            "submitted_at": assign.submitted_at,
+            "submission_text": assign.submission_text,
+            "submission_file_id": assign.submission_file_id,
+            "reward": task.reward_coins or 0,
+        }
+
+def approve_assignment(assignment_id: int) -> bool:
+    """
+    Одобрить сдачу: поменять статус на 'approved' и начислить монеты.
+    """
+    with SessionLocal() as s:
+        assign: TaskAssignment | None = s.get(TaskAssignment, assignment_id)
+        if not assign:
+            log.warning("[approve_assignment] assignment %s not found", assignment_id)
+            return False
+
+        if assign.status != "submitted":
+            log.warning(
+                "[approve_assignment] assignment %s has status %s, expected 'submitted'",
+                assignment_id,
+                assign.status,
+            )
+            return False
+
+        user: User | None = s.get(User, assign.user_id)
+        task: Task | None = s.get(Task, assign.task_id)
+
+        reward = (task.reward_coins or 0) if task else 0
+
+        if user and reward:
+            user.coins = (user.coins or 0) + reward
+            log.info(
+                "[approve_assignment] user %s got +%s coins (now %s)",
+                user.tg_id,
+                reward,
+                user.coins,
+            )
+
+        assign.status = "approved"
+        s.commit()
+        return True
+
+
+def reject_assignment(assignment_id: int) -> bool:
+    """
+    Отклонить сдачу: просто поменять статус на 'rejected'.
+    """
+    with SessionLocal() as s:
+        assign: TaskAssignment | None = s.get(TaskAssignment, assignment_id)
+        if not assign:
+            log.warning("[reject_assignment] assignment %s not found", assignment_id)
+            return False
+
+        if assign.status != "submitted":
+            log.warning(
+                "[reject_assignment] assignment %s has status %s, expected 'submitted'",
+                assignment_id,
+                assign.status,
+            )
+            return False
+
+        assign.status = "rejected"
+        s.commit()
+        return True
+
+
+def get_assignment_for_admin(assignment_id: int) -> dict | None:
+    """
+    Одна конкретная заявка по id.
+    """
+    with SessionLocal() as s:
+        row = (
+            s.query(
+                TaskAssignment,
+                Task.title,
+                Task.reward_coins,
+                Task.difficulty,
+                User.username,
+                User.tg_id,
+            )
+            .join(Task, TaskAssignment.task_id == Task.id)
+            .join(User, TaskAssignment.user_id == User.id)
+            .filter(TaskAssignment.id == assignment_id)
+            .one_or_none()
+        )
+
+        if row is None:
+            return None
+
+        a, title, reward, diff, uname, tg_id = row
+
+        return {
+            "id": a.id,
+            "task_id": a.task_id,
+            "user_id": a.user_id,
+            "user_tg_id": tg_id,
+            "user_username": uname,
+            "task_title": title,
+            "task_reward": reward or 0,
+            "task_difficulty": diff,
+            "status": a.status,
+            "submitted_at": a.submitted_at,
+            "submission_text": a.submission_text,
+            "submission_file_id": a.submission_file_id,
+        }
+
 
 def submit_task(
     user_tg_id: int,

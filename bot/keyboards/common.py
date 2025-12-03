@@ -94,7 +94,28 @@ def admin_grant_kb(user_id: int):
         ]
     ])
 
-def admin_assignment_kb(assignment_id: int) -> InlineKeyboardMarkup:
+
+def admin_assignments_pending_kb(items: list[dict]) -> InlineKeyboardMarkup:
+    """
+    Клавиатура со списком задач на модерации.
+    items — это список dict'ов из list_pending_assignments().
+    """
+    kb = InlineKeyboardBuilder()
+
+    for ass in items:
+        user = ass["user_username"] or ass["user_tg_id"]
+        text = f"#{ass['id']} · {ass['task_title']} · @{user}"
+        kb.button(
+            text=text[:64],  # на всякий случай ограничим длину
+            callback_data=f"admin:assign:open:{ass['id']}",
+        )
+
+    kb.button(text="⬅️ В админку", callback_data="admin:root")
+    kb.adjust(1)
+    return kb.as_markup()
+
+
+def admin_assignment_kb(assignment_id: list[dict]) -> InlineKeyboardMarkup:
     """
     Кнопки под конкретным назначением:
     - Одобрить
@@ -119,6 +140,26 @@ def admin_assignment_kb(assignment_id: int) -> InlineKeyboardMarkup:
             )
         ],
     ]
+
+    for assign in assignment_id:
+        aid = assign["id"]
+        uname = assign.get("user_username") or "без ника"
+        title = assign.get("task_title") or "без названия"
+
+        rows.append([
+            InlineKeyboardButton(
+                text=f"{uname}: {title[:30]}",
+                callback_data=f"admin:assign:open:{aid}",
+            )
+        ])
+
+        rows.append([
+            InlineKeyboardButton(
+                text="⬅️ Назад",
+                callback_data=f"admin:root",
+            )
+        ])
+
 
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
@@ -171,6 +212,35 @@ def admin_tasks_list_kb(tasks: list) -> InlineKeyboardMarkup:
             InlineKeyboardButton(text="🗑 Удалить", callback_data=f"admin:tasks:delete:{tid}"),
         ])
     rows.append([InlineKeyboardButton(text="⬅️ Назад", callback_data="admin:tasks")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def admin_assignments_list_kb(items: list[dict]) -> InlineKeyboardMarkup:
+    rows: list[list[InlineKeyboardButton]] = []
+
+    for it in items:
+        aid = it["id"]
+        uname = it.get("user_username") or "без никнейма"
+        title = (it.get("task_title") or "без названия")[:40]
+
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    text=f"{uname}: {title}",
+                    callback_data=f"admin:assign:open:{aid}",
+                )
+            ]
+        )
+
+    rows.append(
+        [
+            InlineKeyboardButton(
+                text="⬅️ Назад",
+                callback_data="admin:root",
+            )
+        ]
+    )
+
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 

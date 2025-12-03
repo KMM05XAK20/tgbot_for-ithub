@@ -19,3 +19,4 @@ def build_dispatcher(bot_token: str) -> tuple[Bot, Dispatcher]:
     dp.include_router(submission_router)
     dp.include_router(admin_router)
     return bot, dp
+    

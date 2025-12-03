@@ -3,6 +3,9 @@ from sqlalchemy.orm import Session
 from sqlalchemy import desc
 from ..storage.models import User
 from ..storage.db import SessionLocal
+import logging
+
+log = logging.getLogger(__name__)
 
 def get_user(tg_id: int) -> Optional[User]:
     with SessionLocal() as session:
@@ -12,6 +15,14 @@ def get_user_by_username(username: str) -> Optional[User]:
     uname = username.lstrip("@").lower()
     with SessionLocal() as s:
         return s.query(User).filter(User.username.ilike(uname)).first()
+
+def get_all_user_tg_ids() -> list[int]:
+    with SessionLocal() as s:
+        rows = s.query(User.tg_id).all()
+        ids = [r[0] for r in rows if r[0] is not None]
+        log.info("[broadcast] loaded %s users", len(ids))
+        return ids
+
 
 def get_user_by_tg_id(tg_id: int) -> Optional[User]:
     with SessionLocal() as s:
