@@ -2,27 +2,35 @@ from aiogram import Router
 
 root_router = Router(name="root")
 
+# обычные хендлеры
+from .handlers import start, menu, profile, rating, mentorship, calendar, help, debug
 
-from .handlers import start, menu, profile, rating
+# хендлеры заданий (каталог + сдача)
 from .handlers.task import catalog, submission
-from .handlers import mentorship, calendar, help
-from .handlers.admin import panel, tasks, grant, broadcast
-from .handlers import debug
 
-# Включаем под-роутеры
+# админские хендлеры
+from .handlers.admin import panel, tasks, grant, broadcast, events
+
+
 root_router.include_routers(
+    # пользователи
     start.router,
     menu.router,
-    tasks.router,
-    broadcast.router,
-    panel.router,
-    grant.router,
     profile.router,
     rating.router,
-    catalog.router,
-    submission.router,
     mentorship.router,
     calendar.router,
-    help.router, 
+    help.router,
     debug.router,
+
+    # задания (каталог/сдача)
+    catalog.router,
+    submission.router,
+
+    # админка
+    panel.router,
+    tasks.router,
+    grant.router,
+    broadcast.router,
+    events.router,
 )

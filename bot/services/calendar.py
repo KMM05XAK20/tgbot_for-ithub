@@ -1,5 +1,6 @@
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
+from typing import List
 from ..storage.db import SessionLocal
 from ..storage.models import Event
 
@@ -31,3 +32,33 @@ def send_event_reminders():
             elif event.event_date - now <= timedelta(hours=1):  # 1 час до события
                 reminders.append(event)
         return reminders
+
+def list_upcomming_events(limit: int = 5) -> List[Event]:
+    now = datetime.utcnow()
+
+    with SessionLocal() as s:
+        rows = (
+            s.query(Event)
+            .filter(Event.created_at >= now)
+            .order_by(Event.created_at.asc())
+            .limit(limit)
+            .all()
+        )
+    return rows
+
+def list_all_events(limit: int = 50) -> list[Event]:
+
+    now = datetime.utcnow()
+
+    with SessionLocal() as s:
+        rows = (
+            s.query(Event)
+            .filter(Event.created_at >= now)
+            .order_by(Event.created_at.asc())
+            .limit(limit)
+            .all()
+        )
+    return rows
+
+
+
