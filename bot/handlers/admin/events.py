@@ -1,98 +1,114 @@
 # bot/handlers/admin/events.py
+from datetime import datetime
 
 from aiogram import Router, F
 from aiogram.types import CallbackQuery, Message
 from aiogram.fsm.context import FSMContext
-from aiogram.fsm.state import StatesGroup, State
-from aiogram.filters import Command
 
-from ...filters.roles import IsAdmin
+from ...states.events import AdminEventForm
+from ...keyboards.common import admin_events_kb
 from ...services.events import create_event, list_upcoming_events
-from ...keyboards.common import admin_panel_kb, calendar_root_kb
-
-from datetime import datetime
 
 router = Router(name="admin_events")
 
 
-class EventCreate(StatesGroup):
-    waiting_title = State()
-    waiting_date = State()
-    waiting_time = State()
-    waiting_description = State()
+# === Корень "События" в админке ===
 
-
-# вход в раздел "События" из главной админки
-@router.callback_query(IsAdmin(), F.data == "admin:events")
+@router.callback_query(F.data == "admin:events")
 async def admin_events_root(cb: CallbackQuery):
-    await cb.message.edit_text(
-        "📅 <b>Управление событиями</b>\n"
-        "Здесь можно добавить событие в календарь или посмотреть список ближайших.",
-        reply_markup=calendar_root_kb(),
-    )
+    events = list_upcoming_events(limit=10)
+    if not events:
+        text = "📅 <b>События</b>\n\nПока событий нет.\nНажми «➕ Добавить событие»."
+    else:
+        lines = ["📅 <b>События</b>"]
+        for e in events:
+            dt_str = e.event_date.strftime("%Y-%m-%d %H:%M")
+            lines.append(f"• <b>{e.title}</b>\n  🕒 {dt_str}")
+        text = "\n\n".join(lines)
+
+    await cb.message.edit_text(text, reply_markup=admin_events_kb())
     await cb.answer()
 
 
-# показать список ближайших событий
-@router.callback_query(IsAdmin(), F.data == "admin:events:list")
-async def admin_events_list(cb: CallbackQuery):
-    events = list_upcoming_events(limit=20)
+# === Старт добавления события ===
 
-    if not events:
-        await cb.message.edit_text(
-            "Пока нет запланированных событий.",
-            reply_markup=calendar_root_kb(),
-        )
-        await cb.answer()
+@router.callback_query(F.data == "admin:events:add")
+async def admin_events_add_start(cb: CallbackQuery, state: FSMContext):
+    await state.clear()
+    await cb.message.edit_text("📝 Введи название события:")
+    await state.set_state(AdminEventForm.waiting_title)
+    await cb.answer()
+
+
+# === Шаг 1: название ===
+
+@router.message(AdminEventForm.waiting_title)
+async def admin_event_title(msg: Message, state: FSMContext):
+    title = msg.text.strip()
+    if not title:
+        await msg.answer("❌ Название не может быть пустым. Введи ещё раз.")
         return
 
-    lines: list[str] = ["📅 <b>Ближайшие события</b>:\n"]
-    for ev in events:
-        dt = ev.starts_at
-        dt_str = dt.strftime("%Y-%m-%d %H:%M")
-        desc = ev.description or "—"
-        lines.append(f"• <b>{ev.title}</b>\n  🕒 {dt_str}\n  📝 {desc}\n  ID: {ev.id}")
-
-    await cb.message.edit_text(
-        "\n\n".join(lines),
-        reply_markup=calendar_root_kb(),
-    )
-    await cb.answer()
-
-
-# старт создания события
-@router.callback_query(IsAdmin(), F.data == "admin:events:add")
-async def admin_event_add_start(cb: CallbackQuery, state: FSMContext):
-    await state.set_state(EventCreate.waiting_title)
-    await cb.message.edit_text(
-        "📝 <b>Новое событие</b>\n"
-        "Отправь название события одним сообщением.\n\n"
-        "Отмена: /cancel",
-    )
-    await cb.answer()
-
-
-@router.message(EventCreate.waiting_title)
-async def admin_event_title(msg: Message, state: FSMContext):
-    await state.update_data(title=msg.text.strip())
-    await state.set_state(EventCreate.waiting_date)
+    await state.update_data(title=title)
     await msg.answer(
-        "📅 Введи дату события в формате <code>YYYY-MM-DD</code>\n"
-        "Например: <code>2025-12-10</code>\n\n"
-        "Отмена: /cancel"
+        "✏ Введи описание события (или отправь <code>-</code>, чтобы пропустить):"
     )
+    await state.set_state(AdminEventForm.waiting_description)
 
 
-@router.message(EventCreate.waiting_time)
+# === Шаг 2: описание ===
+
+@router.message(AdminEventForm.waiting_description)
+async def admin_event_description(msg: Message, state: FSMContext):
+    raw = msg.text.strip()
+    description = None if raw == "-" else raw
+
+    await state.update_data(description=description)
+    await msg.answer(
+        "📅 Введи дату события в формате <b>ГГГГ-ММ-ДД</b>\n"
+        "Например: <code>2025-12-24</code>"
+    )
+    await state.set_state(AdminEventForm.waiting_date)
+
+
+# === Шаг 3: дата ===
+
+@router.message(AdminEventForm.waiting_date)
+async def admin_event_date(msg: Message, state: FSMContext):
+    date_raw = msg.text.strip()
+
+    # ✅ Проверяем формат ГГГГ-ММ-ДД
+    try:
+        datetime.strptime(date_raw, "%Y-%m-%d")
+    except ValueError:
+        await msg.answer(
+            "❌ Неверный формат даты.\n"
+            "Формат: <b>ГГГГ-ММ-ДД</b>\n"
+            "Например: <code>2025-12-24</code>"
+        )
+        return
+
+    await state.update_data(date=date_raw)
+
+    await msg.answer(
+        f"🕒 Введи время для события на {date_raw}\n"
+        f"Формат: <b>ЧЧ:ММ</b>, например: <code>18:30</code>"
+    )
+    await state.set_state(AdminEventForm.waiting_time)
+
+
+# === Шаг 4: время + создание ===
+
+@router.message(AdminEventForm.waiting_time)
 async def admin_event_time(msg: Message, state: FSMContext):
     time_raw = msg.text.strip()
     data = await state.get_data()
 
     title = data["title"]
     description = data.get("description")
-    date_raw = data["date"]   # вот тут уже ОК — мы её сохранили в предыдущем шаге
+    date_raw = data["date"]  # мы её сохранили на предыдущем шаге
 
-    # валидируем и собираем datetime
+    # валидируем дату+время
     try:
         dt = datetime.strptime(f"{date_raw} {time_raw}", "%Y-%m-%d %H:%M")
     except ValueError:
@@ -106,56 +122,9 @@ async def admin_event_time(msg: Message, state: FSMContext):
     create_event(
         title=title,
         description=description,
-        event_dt=dt,          # тут подставь те аргументы, которые ждёт твой create_event
+        event_dt=dt,
         creator_tg_id=msg.from_user.id,
     )
 
     await state.clear()
-    await msg.answer("✅ Событие добавлено в календарь!", reply_markup=admin_panel_kb())
-
-
-@router.message(EventCreate.waiting_time)
-async def admin_event_time(msg: Message, state: FSMContext):
-    text = msg.text.strip()
-    try:
-        t = datetime.strptime(text, "%H:%M").time()
-    except ValueError:
-        await msg.answer("❌ Неверный формат времени. Пример: <code>19:30</code>")
-        return
-
-    await state.update_data(time=text)
-    await state.set_state(EventCreate.waiting_description)
-    await msg.answer(
-        "✏️ Теперь отправь описание события (можно в несколько строк).\n"
-        "Если описания не нужно — отправь дефис <code>-</code>."
-    )
-
-
-@router.message(EventCreate.waiting_description)
-async def admin_event_description(msg: Message, state: FSMContext):
-    data = await state.get_data()
-    title = data["title"]
-    date_str = data["date"]
-    time_str = data["time"]
-
-    description = None if msg.text.strip() == "-" else msg.text.strip()
-
-    # собираем datetime
-    dt = datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %H:%M")
-
-    event_id = create_event(title=title, description=description, created_at=dt)
-    await state.clear()
-
-    await msg.answer(
-        f"✅ Событие создано!\n\n"
-        f"<b>{title}</b>\n"
-        f"🕒 {dt.strftime('%Y-%m-%d %H:%M')}\n"
-        f"ID: <code>{event_id}</code>",
-        reply_markup=admin_panel_kb(),
-    )
-
-
-@router.message(Command("cancel"))
-async def admin_event_cancel(msg: Message, state: FSMContext):
-    await state.clear()
-    await msg.answer("Отменено.", reply_markup=admin_panel_kb())
+    await msg.answer("✅ Событие добавлено в календарь!", reply_markup=admin_events_kb())

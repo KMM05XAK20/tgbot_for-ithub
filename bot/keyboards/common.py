@@ -50,15 +50,15 @@ def admin_panel_kb() -> InlineKeyboardMarkup:
 
     return kb.as_markup()
 
-# def admin_panel_kb() -> InlineKeyboardMarkup:
-#     return InlineKeyboardMarkup(inline_keyboard=[
-#         [InlineKeyboardButton(text="🧑‍🏫 Менторы", callback_data="admin:mentors")],
-#         [InlineKeyboardButton(text="📚 Задания", callback_data="admin:tasks")],          # если есть раздел заданий
-#         [InlineKeyboardButton(text="🕒 На модерации", callback_data="admin:assignments:pending")],
-#         [InlineKeyboardButton(text="📣 Рассылка", callback_data="admin:broadcast")],     # если есть рассылка
-#         [InlineKeyboardButton(text="📅 События", callback_data="admin:events")]
-#         [InlineKeyboardButton(text="⬅️ В меню", callback_data="menu:open:main")],
-#     ])
+def admin_events_kb() -> InlineKeyboardMarkup:
+
+    kb = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [InlineKeyboardButton(text="➕ Добавить событие", callback_data="admin:events:add")],
+                [InlineKeyboardButton(text="⬅️ В админку", callback_data="admin:root")],
+            ]
+        )
+    return kb
 
 
 def admin_pending_kb(assignments: Sequence[TaskAssignment]) -> InlineKeyboardMarkup:
@@ -513,13 +513,6 @@ def rating_kb():
     return kb.as_markup()
 
 # calendar
-def calendar_root_kb() -> InlineKeyboardMarkup:
-    kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="➕ Добавить событие", callback_data="admin:events:add")],
-        [InlineKeyboardButton(text="📅 Список событий", callback_data="admin:events:list")],
-        [InlineKeyboardButton(text="⬅️ В меню", callback_data="admin:root")],
-    ])
-    return kb
 
 def get_assignment_card(assignment_id: int) -> tuple[str, InlineKeyboardMarkup] | None:
     """Собирает текст и клавиатуру для одной заявки на модерации."""
