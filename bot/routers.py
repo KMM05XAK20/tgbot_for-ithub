@@ -9,7 +9,7 @@ from .handlers import start, menu, profile, rating, mentorship, calendar, help, 
 from .handlers.task import catalog, submission
 
 # админские хендлеры
-from .handlers.admin import panel, tasks, grant, broadcast, events
+from .handlers.admin import panel, tasks, grant, broadcast, events, stats
 
 
 root_router.include_routers(
@@ -32,5 +32,6 @@ root_router.include_routers(
     tasks.router,
     grant.router,
     broadcast.router,
+    stats.router,
     events.router,
 )

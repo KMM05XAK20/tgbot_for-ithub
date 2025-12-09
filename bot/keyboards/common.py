@@ -40,6 +40,7 @@ def admin_panel_kb() -> InlineKeyboardMarkup:
     # Второй ряд
     kb.button(text="📅 События", callback_data="admin:events")
     kb.button(text="📨 Рассылка", callback_data="admin:broadcast")
+    kb.button(text="📊 Статистика", callback_data="admin:stats")
 
     # Делаем по 2 кнопки в ряд для верхних
     kb.adjust(2, 2)

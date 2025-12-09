@@ -10,6 +10,7 @@ backupas/server_old.db
 
 # .py files 
 test.py
+tools/count_loc.py
 # pycache
 __pycache__/
 *.pyc
