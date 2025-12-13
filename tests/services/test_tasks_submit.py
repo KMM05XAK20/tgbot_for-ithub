@@ -1,5 +1,7 @@
+import pytest
+
 def test_submit_task_no_active_assignment(mocker):
-    from bot.services import open_task_details as svc
+    from bot.services import tasks as svc
 
     mocker.patch.object(svc, "get_active_assignment", return_value=None)
 

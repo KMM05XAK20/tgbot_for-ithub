@@ -1,4 +1,5 @@
 from unittest.mock import AsyncMock
+from venv import create
 import pytest
 
 
@@ -104,6 +105,9 @@ async def test_task_view_shows_take_button_if_not_taken(cb, mocker):
     kb = mocker.patch(
         "bot.handlers.task.catalog.task_view_kb", return_value="KB", create=True
     )
+    kb2 = mocker.patch(
+        "bot.handlers.task.catalog.task_view_kb", return_value="KB", create=True
+    )
     safe_edit = mocker.patch(
         "bot.handlers.task.catalog.safe_edit_text", new=AsyncMock(), create=True
     )
@@ -111,5 +115,8 @@ async def test_task_view_shows_take_button_if_not_taken(cb, mocker):
     cb.data = "tasks:view:1"
     await open_task_details(cb)
 
+    assert safe_edit.await_count == 1
+    kw = safe_edit.await_args.kw
+    assert kw.get("reply_markup") == "KB"
     kb.assert_called_once_with(task_id=1, already_taken=False)
     safe_edit.assert_awaited()

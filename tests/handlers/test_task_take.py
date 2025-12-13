@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock
 
 @pytest.mark.asyncio
 async def test_take_task_when_no_active_assignment(cb, mocker):
-    from bot.handlers.task.catalog import open_task_details
+    from bot.handlers.task.catalog import take_task_cb
 
     mocker.patch.object(cb, "_commit", create=True)
     mocker.patch(
@@ -23,9 +23,11 @@ async def test_take_task_when_no_active_assignment(cb, mocker):
     )
 
     cb.data = "tasks:take:2"
-    await open_task_details(cb)
+    await take_task_cb(cb)
+
 
     take.assert_called_once()
+    assert safe_edit.await_count == 1
     kb.assert_called_once_with(task_id=2, already_taken=True)
     safe_edit.assert_awaited()
     cb.answer.assert_awaited()
@@ -33,7 +35,7 @@ async def test_take_task_when_no_active_assignment(cb, mocker):
 
 @pytest.mark.asyncio
 async def test_take_task_when_already_taken_shows_alert(cb, mocker):
-    from bot.handlers.task.catalog import open_task_details
+    from bot.handlers.task.catalog import take_task_cb
 
     mocker.patch(
         "bot.handlers.task.catalog.has_active_assignment",
@@ -42,6 +44,6 @@ async def test_take_task_when_already_taken_shows_alert(cb, mocker):
     )
 
     cb.data = "tasks:take:2"
-    await open_task_details(cb)
+    await take_task_cb(cb)
 
     cb.answer.assert_awaited()  # обычно show_alert=True внутри

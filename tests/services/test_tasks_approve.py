@@ -9,10 +9,10 @@ def test_approve_adds_coins(mocker):
     user = type("U", (), {"id": 1, "coins": 0})()
 
     mocker.patch.object(
-        svc, "get_assignment_by_id", return_value=assignment, create=True
+        svc, "bot.services.tasks.get_assignment_by_id", return_value=assignment, create=True
     )
-    mocker.patch.object(svc, "get_task_by_id", return_value=task, create=True)
-    mocker.patch.object(svc, "get_user_by_id", return_value=user, create=True)
+    mocker.patch.object(svc, "bot.services.tasks.get_task_by_id", return_value=task, create=True)
+    mocker.patch.object(svc, "bot.services.tasks.get_user_by_id", return_value=user, create=True)
 
     # мок “сохранения”
     mocker.patch("bot.services.tasks._commit", create=True)

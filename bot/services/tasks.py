@@ -861,6 +861,9 @@ def get_assignment_card(assignment_id: int) -> str | None:
 
         return text
 
+def get_user(get_assignment_card):
+    get = get_assignment_card()
+    return get
 
 def list_pending_assignments(limit: int = 20) -> list[dict]:
     """
