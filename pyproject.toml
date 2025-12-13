@@ -9,3 +9,8 @@ dev = [
     "python-dotenv>=1.2.1",
     "sqlalchemy>=2.0.44",
 ]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+asyncio_mode = "strict"
