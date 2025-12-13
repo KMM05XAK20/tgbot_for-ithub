@@ -1,10 +1,12 @@
 from dataclasses import dataclass
 import os
+import redis
 from pathlib import Path
 from dotenv import load_dotenv
 
 @dataclass
 class Setting:
+    redis_cli = redis.StrictRedis(host="localhost", port=6379, db=0, decode_responses=True)
     bot_token: str
     admin_ids: list[str]
     use_webhook: bool = False

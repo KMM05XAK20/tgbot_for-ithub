@@ -275,8 +275,9 @@ def admin_assignments_list_kb(items: list[dict]) -> InlineKeyboardMarkup:
 def profile_kb() -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     kb.button(text="📜 История активности", callback_data="profile:history")
+    kb.button(text="✏️ Изменить", callback_data="profile:edit")
     kb.button(text="⬅️ Назад в меню", callback_data="menu:open:root")
-    kb.adjust(1)
+    kb.adjust(2)
     return kb.as_markup()
 
 def profile_history_filters_kb(counts: dict[str, int]) -> InlineKeyboardMarkup:

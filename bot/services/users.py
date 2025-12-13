@@ -11,9 +11,19 @@ def get_user(tg_id: int) -> Optional[User]:
     with SessionLocal() as session:
         return session.query(User).filter_by(tg_id=tg_id).first()
 
-def get_user_by_username(username: str) -> Optional[User]:
+def get_user_profile(tg_id: int) -> Optional[User]:
+    with SessionLocal() as session:
+        return session.query(User).filter_by(User.tg_id == tg_id).first()
+    
+def get_user_badges(tg_id: int) -> Optional[User]:
+    with SessionLocal() as s:
+        user = s.query(User).filter(User.tg_id == tg_id).first()
+        return user.badges if user else []
+
+def get_user_by_username(username: str, tg_id: int) -> Optional[User]:
     uname = username.lstrip("@").lower()
     with SessionLocal() as s:
+        user = s.query(User).filter(tg_id == tg_id).first()
         return s.query(User).filter(User.username.ilike(uname)).first()
 
 def get_all_user_tg_ids() -> list[int]:

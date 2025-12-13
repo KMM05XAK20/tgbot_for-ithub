@@ -1,8 +1,9 @@
 from aiogram import Router, F
-from aiogram.types import CallbackQuery
+from aiogram.types import CallbackQuery, Message
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command
-from ..services.users import get_user
+from ..services.users import get_user_by_username
+from ..services.tasks import get_user
 from ..keyboards.common import profile_kb, main_menu_kb, profile_history_filters_kb, profile_history_list_kb, profile_assignment_kb
 from ..services.tasks import count_assignments_by_status, list_assignments, get_assignment_card, reward_to_difficulty
 from ..services.levels import level_by_coins, render_progress_bar
@@ -11,51 +12,56 @@ from ..services.rating import get_user_position
 
 router = Router(name="profile")
 
-def _role_title(code: str | None) -> str:
-    mapping = {"active": "Активный спикер", "guru": "Гуру тех.заданий", "helper": "Помогатор"}
-    return mapping.get(code or "", "—")
-
 def _group_title(group: str) -> str:
     return {"active": "Активные", "submitted": "На проверке", "done": "Завершённые"}.get(group, "Активные")
 
-@router.callback_query(F.data == "menu:open:profile")
-async def open_profile(cb: CallbackQuery):
-    user = get_user(cb.from_user.id)
-    if not user:
-        await cb.message.edit_text("Профиль не найден. Нажмите /start ещё раз.", reply_markup=main_menu_kb())
-        return await cb.answer()
+def _profile_card(username: str | None, role: str | None, coins: int, position: int | None, badges: list[str], created_at) -> str:
+    name_line = f"<b>@{username}</b>" if username else "<b>без никнейма</b>"
+    pos_line = f"{position} место" if position is not None else "—"
+    badges_line = " • ".join(badges) if badges else "пока нет — всё впереди 🙂"
+    created = created_at.strftime("%Y-%m-%d") if created_at else "—"
 
-    coins = user.coins or 0
-    li = level_by_coins(coins)
-    if li.next_base is None:
-        lvl_line = f"🏅 Level: <b>{li.level}</b> (MAX)"
-        progress_line = f"{render_progress_bar(li.progress_percent)} 100%"
-    else:
-        need = li.to_next or 0
-        lvl_line = f"🏅 Level: <b>{li.level}</b> · {coins}/{li.next_base} coins"
-        progress_line = f"{render_progress_bar(li.progress_percent)} {li.progress_percent}%  (to next: {need})"
-
-    badges_line = render_badges_line(coins)
-
-    pos, _ = get_user_position(cb.from_user.id)
-    position_text = f"#{pos}" if pos is not None else "—"
-
-    created = user.created_at.strftime("%Y-%m-%d") if getattr(user, "created_at", None) else "—"
-    name_line = f"<b>@{user.username}</b>" if user.username else "<b>без никнейма</b>"
-
-    text = (
-        "👤 <b>Профиль</b>\n"
+    return (
+        "👤 <b>Твой профиль</b>\n"
         f"{name_line}\n\n"
-        f"🎭 Роль: <b>{_role_title(user.role)}</b>\n"
-        f"🪙 Баллы: <b>{coins}</b>\n"
-        f"{lvl_line}\n{progress_line}\n"
+        f"🎭 Роль: <b>{_role_title(role)}</b>\n"
+        f"🪙 Баллы (coins): <b>{coins}</b>\n"
+        f"📊 Позиция в рейтинге: <b>{pos_line}</b>\n"
         f"🎖 Бейджи: {badges_line}\n"
-        f"🏆 Рейтинг: <b>{position_text}</b>\n"
-        f"📅 С нами с: {created}"
+        f"📅 В комьюнити с: <b>{created}</b>\n\n"
+        "Поднимай уровень, выполняя задания. Чем выше уровень — тем больше доверия и возможностей 🚀"
     )
 
-    await cb.message.edit_text(text, reply_markup=profile_kb())
-    await cb.answer()
+
+@router.message(Command("profile"))
+async def open_profile(msg: Message):
+    user_id = msg.from_user.id
+    
+    # Получаем профиль пользователя
+    profile_data = get_user_by_username(user_id)  # Извлекаем данные из базы данных
+    badges = get_user(user_id)  # Получаем бейджи пользователя
+
+    # Формируем текст профиля
+    profile_text = _profile_card(
+        username=profile_data.username,
+        role=profile_data.role,
+        coins=profile_data.coins,
+        position=profile_data.position,
+        badges=badges,
+        created_at=profile_data.created_at,
+    )
+
+    # Отправляем сообщение с профилем
+    await msg.answer(profile_text, reply_markup=profile_kb())
+
+
+def _role_title(role: str) -> str:
+    roles = {
+        "admin": "Админ",
+        "mentor": "Наставник",
+        "user":"Пользователь",
+    }
+    return roles.get(role, "Неизвестная роль")
 
 @router.callback_query(F.data == "profile:history")
 async def profile_history_root(cb: CallbackQuery):
