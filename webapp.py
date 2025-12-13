@@ -1,5 +1,5 @@
-
-import os, asyncio
+import os
+import asyncio
 from flask import Flask, request, abort
 from aiogram.types import Update
 from bot.config import get_settings
@@ -12,6 +12,7 @@ bot, dp = build_dispatcher(settings.bot_token)
 WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", "supersecret")
 
 app = Flask(__name__)
+
 
 @app.post(f"/webhook/{WEBHOOK_SECRET}")
 def telegram_webhook():

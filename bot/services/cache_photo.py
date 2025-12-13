@@ -1,4 +1,3 @@
-import redis
 from aiogram import Router
 from aiogram.types import Message
 from aiogram.fsm.context import FSMContext
@@ -10,6 +9,7 @@ router = Router(name="task_submission")
 
 redis_client = Setting.redis_cli
 
+
 def save_photo_to_redis(photo_file_id: str) -> str:
     uni_key = str(uuid.uuid4())
 
@@ -17,13 +17,14 @@ def save_photo_to_redis(photo_file_id: str) -> str:
 
     return uni_key
 
-def get_photo_from_redis(key: str):
 
+def get_photo_from_redis(key: str):
     redis_client.get(key)
 
-def delete_photo_from_redis(key: str):
 
+def delete_photo_from_redis(key: str):
     redis_client.delete(key)
+
 
 @router.message(lambda message: message.photo)
 async def handle_photo(message: Message, state: FSMContext):
@@ -35,6 +36,7 @@ async def handle_photo(message: Message, state: FSMContext):
     await state.update_data(redis_key=redis_key)
     await message.answer("Фото получено! Ожидайте проверки модератором.")
 
+
 @router.message(lambda message: message.text == "Проверить фото")
 async def check_photo(message: Message, state: FSMContext):
     data = await state.get_data()
@@ -43,7 +45,7 @@ async def check_photo(message: Message, state: FSMContext):
     if not redis_key:
         await message.answer("Нет фото для проверки.")
         return
-    
+
     # получили фото по ключу из redis'a
     file_id = get_photo_from_redis(redis_key)
 
@@ -53,6 +55,5 @@ async def check_photo(message: Message, state: FSMContext):
     # Отправили на модерацию
     await message.answer("Фото для проверки: ", photo=file_id)
 
-    
     delete_photo_from_redis(redis_key)
     await message.answer("Фото проверено и удалено.")

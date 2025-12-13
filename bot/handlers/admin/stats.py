@@ -6,13 +6,13 @@ from ...keyboards.common import admin_panel_kb
 
 router = Router(name="admin_stats")
 
+
 @router.callback_query(F.data == "admin:stats")
 async def admin_stats_handler(cb: CallbackQuery):
     data = collect_admin_stats()
     top_users = get_top_users(5)
 
     lines = []
-
 
     lines.append("👥 <b>Пользователи</b>")
     lines.append(f"• Всего: <b>{data['total_users']}</b>")
@@ -29,7 +29,6 @@ async def admin_stats_handler(cb: CallbackQuery):
     lines.append(f"• Одобрено: <b>{data['assignments_approved']}</b>")
     lines.append(f"• Отклонено: <b>{data['assignments_rejected']}</b>\n")
 
-
     if top_users:
         lines.append("🏆 <b>Топ по coins</b>")
         for idx, u in enumerate(top_users, start=1):
@@ -37,7 +36,6 @@ async def admin_stats_handler(cb: CallbackQuery):
             coins = u.coins or 0
             lines.append(f"{idx}. {name} - <b>{coins}</b>🪙")
 
-    
     text = "📊 <b>Статистика бота</b>\n\n" + "\n".join(lines)
 
     await cb.message.edit_text(text, reply_markup=admin_panel_kb())

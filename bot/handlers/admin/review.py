@@ -1,15 +1,14 @@
 from aiogram import Router, F
 from aiogram.types import CallbackQuery
-from aiogram.enums import ParseMode
 
 from ...filters.roles import IsAdmin
-from ...keyboards.common import admin_review_root_kb, admin_review_item_kb
-from ...services.tasks import list_submitted_assignments, moderate_assignment, _get
-from ...services.users import get_user
+from ...keyboards.common import admin_review_root_kb
+from ...services.tasks import moderate_assignment
 
 router = Router(name="admin_review")
 
 # ... остальные хендлеры (review_root, review_pending) без изменений ...
+
 
 @router.callback_query(IsAdmin(), F.data.regexp(r"^admin:review:\d+:(approve|reject)$"))
 async def review_decide(cb: CallbackQuery):
@@ -31,7 +30,6 @@ async def review_decide(cb: CallbackQuery):
         return await cb.answer("Элемент не найден или уже обработан", show_alert=True)
 
     await cb.message.edit_text(
-        f"Готово: статус → {updated.status}",
-        reply_markup=admin_review_root_kb()
+        f"Готово: статус → {updated.status}", reply_markup=admin_review_root_kb()
     )
     await cb.answer("OK")

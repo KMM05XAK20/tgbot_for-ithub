@@ -9,6 +9,7 @@ from .handlers.task.catalog import router as tasks_router
 from .handlers.task.submission import router as submission_router
 from .handlers.admin.panel import router as admin_router
 
+
 def build_dispatcher(bot_token: str) -> tuple[Bot, Dispatcher]:
     logging.basicConfig(level=logging.INFO)
     bot = Bot(token=bot_token, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
@@ -19,4 +20,3 @@ def build_dispatcher(bot_token: str) -> tuple[Bot, Dispatcher]:
     dp.include_router(submission_router)
     dp.include_router(admin_router)
     return bot, dp
-    

@@ -3,17 +3,23 @@ from sqlalchemy import select, func
 from ..storage.db import SessionLocal
 from ..storage.models import User
 
+
 def get_leaderboard(limit: int = 10) -> List[Tuple[int, str | None, int]]:
     """
     Возвращает топ пользователей: [(tg_id, username, coins), ...]
     """
     with SessionLocal() as s:
         stmt = (
-            select(User.tg_id, User.username, func.coalesce(User.coins, 0).label("coins"))
+            select(
+                User.tg_id, User.username, func.coalesce(User.coins, 0).label("coins")
+            )
             .order_by(func.coalesce(User.coins, 0).desc(), User.id.asc())
             .limit(limit)
         )
-        return [(tg_id, username, coins) for tg_id, username, coins in s.execute(stmt).all()]
+        return [
+            (tg_id, username, coins) for tg_id, username, coins in s.execute(stmt).all()
+        ]
+
 
 def get_user_position(user_tg_id: int) -> tuple[int | None, int]:
     """

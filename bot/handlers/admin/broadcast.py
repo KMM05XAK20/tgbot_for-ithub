@@ -2,7 +2,12 @@ import asyncio
 import logging
 
 from aiogram import Router, F
-from aiogram.types import CallbackQuery, Message, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import (
+    CallbackQuery,
+    Message,
+    InlineKeyboardMarkup,
+    InlineKeyboardButton,
+)
 from aiogram.fsm.context import FSMContext
 from aiogram.enums import ParseMode
 from aiogram import Bot
@@ -42,11 +47,17 @@ async def broadcast_preview(msg: Message, state: FSMContext):
     kb = InlineKeyboardMarkup(
         inline_keyboard=[
             [
-                InlineKeyboardButton(text="✅ Отправить", callback_data="admin:broadcast:send"),
-                InlineKeyboardButton(text="✏️ Изменить", callback_data="admin:broadcast:edit"),
+                InlineKeyboardButton(
+                    text="✅ Отправить", callback_data="admin:broadcast:send"
+                ),
+                InlineKeyboardButton(
+                    text="✏️ Изменить", callback_data="admin:broadcast:edit"
+                ),
             ],
             [
-                InlineKeyboardButton(text="⬅️ Отмена", callback_data="admin:broadcast:cancel"),
+                InlineKeyboardButton(
+                    text="⬅️ Отмена", callback_data="admin:broadcast:cancel"
+                ),
             ],
         ]
     )

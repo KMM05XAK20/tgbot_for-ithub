@@ -1,7 +1,6 @@
 from aiogram import Router, F
 from aiogram.types import CallbackQuery, Message
 from aiogram.enums import ParseMode
-from aiogram.utils.keyboard import InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.filters import Command
 from ..services.calendar import get_upcoming_events, get_all_events, list_all_events
 from ..services.events import list_upcoming_events
@@ -43,6 +42,7 @@ async def open_calendar(cb: CallbackQuery):
     await cb.message.edit_text(text, reply_markup=main_menu_kb())
     await cb.answer()
 
+
 @router.message(F.text == "/calendar")
 async def calendar_command(msg: Message):
     events = list_upcoming_events(limit=10)
@@ -53,11 +53,12 @@ async def calendar_command(msg: Message):
             reply_markup=main_menu_kb(),
         )
         return
-    
+
     lines = [_format_event_line(ev) for ev in events]
     text = "🗓 <b>Ближайшие события</b>\n\n" + "\n\n".join(lines)
 
     await msg.answer(text, reply_markup=main_menu_kb())
+
 
 # Показ ближайших событий
 @router.message(Command("calendar"))
@@ -76,8 +77,9 @@ async def show_upcoming_events(msg: Message):
 
     await msg.answer(text, reply_markup=profile_kb())
 
+
 # Показ всех событий
-@router.callback_query(F.data == "mentor:choose") # calendar:all // mentor:choose" 
+@router.callback_query(F.data == "mentor:choose")  # calendar:all // mentor:choose"
 async def show_all_events(cb: CallbackQuery):
     user_id = cb.from_user.id
     events = get_all_events(user_id)
@@ -96,18 +98,15 @@ async def show_all_events(cb: CallbackQuery):
 
 
 def _render_events(events) -> str:
-
     if not events:
         return "Пока нет ближайших событий 🙈"
-    
-    lines: list[str] = ["🗓 <b>Ближайшие события</b>:\n"]
-    
-    for ev in events:
 
+    lines: list[str] = ["🗓 <b>Ближайшие события</b>:\n"]
+
+    for ev in events:
         title = getattr(ev, "title", "Без названия")
-        desc  = (getattr(ev, "description", "") or "").strip()
-        dt    = getattr(ev, "start_at", None)\
-        
+        desc = (getattr(ev, "description", "") or "").strip()
+        dt = getattr(ev, "start_at", None)
         if dt is None:
             dt_str = dt.strftime("%d.%m %H:%M")
         else:
@@ -119,17 +118,13 @@ def _render_events(events) -> str:
         else:
             desc_part = ""
 
-        lines.append( 
-            f"• <b>{title}</b>\n"
-            f"  🕒 {dt_str}"
-            f"{desc_part}"
-            )
+        lines.append(f"• <b>{title}</b>\n  🕒 {dt_str}{desc_part}")
     return "\n\n".join(lines)
+
 
 @router.callback_query(F.data == "menu:open:calendar")
 async def open_calendar_root(cb: CallbackQuery):
-
-    events =  list_upcoming_events(limit=5)
+    events = list_upcoming_events(limit=5)
     text = _render_events(events)
 
     await cb.message.edit_text(
@@ -139,17 +134,17 @@ async def open_calendar_root(cb: CallbackQuery):
     )
     await cb.answer()
 
-@router.callback_query(F.data =="calendar:all")
-async def open_caledar_all(cb: CallbackQuery):
 
+@router.callback_query(F.data == "calendar:all")
+async def open_caledar_all(cb: CallbackQuery):
     events = list_all_events(limit=50)
 
     if not events:
         text = "Пока нет запланированных событий 🙈"
     else:
         text = _render_events(events).replace(
-        "🗓 <b>Ближайшие события</b>:", "📅 <b>Весь календарь</b>:"
-    )
+            "🗓 <b>Ближайшие события</b>:", "📅 <b>Весь календарь</b>:"
+        )
 
     await cb.message.answer(
         text,
@@ -157,6 +152,7 @@ async def open_caledar_all(cb: CallbackQuery):
         parse_mode=ParseMode.HTML,
     )
     await cb.answer()
+
 
 @router.callback_query(F.data == "menu:open:main")
 async def back_to_main_menu(cb: CallbackQuery):

@@ -14,6 +14,7 @@ router = Router(name="admin_events")
 
 # === Корень "События" в админке ===
 
+
 @router.callback_query(F.data == "admin:events")
 async def admin_events_root(cb: CallbackQuery):
     events = list_upcoming_events(limit=10)
@@ -32,6 +33,7 @@ async def admin_events_root(cb: CallbackQuery):
 
 # === Старт добавления события ===
 
+
 @router.callback_query(F.data == "admin:events:add")
 async def admin_events_add_start(cb: CallbackQuery, state: FSMContext):
     await state.clear()
@@ -41,6 +43,7 @@ async def admin_events_add_start(cb: CallbackQuery, state: FSMContext):
 
 
 # === Шаг 1: название ===
+
 
 @router.message(AdminEventForm.waiting_title)
 async def admin_event_title(msg: Message, state: FSMContext):
@@ -58,6 +61,7 @@ async def admin_event_title(msg: Message, state: FSMContext):
 
 # === Шаг 2: описание ===
 
+
 @router.message(AdminEventForm.waiting_description)
 async def admin_event_description(msg: Message, state: FSMContext):
     raw = msg.text.strip()
@@ -72,6 +76,7 @@ async def admin_event_description(msg: Message, state: FSMContext):
 
 
 # === Шаг 3: дата ===
+
 
 @router.message(AdminEventForm.waiting_date)
 async def admin_event_date(msg: Message, state: FSMContext):
@@ -98,6 +103,7 @@ async def admin_event_date(msg: Message, state: FSMContext):
 
 
 # === Шаг 4: время + создание ===
+
 
 @router.message(AdminEventForm.waiting_time)
 async def admin_event_time(msg: Message, state: FSMContext):
@@ -127,4 +133,6 @@ async def admin_event_time(msg: Message, state: FSMContext):
     )
 
     await state.clear()
-    await msg.answer("✅ Событие добавлено в календарь!", reply_markup=admin_events_kb())
+    await msg.answer(
+        "✅ Событие добавлено в календарь!", reply_markup=admin_events_kb()
+    )

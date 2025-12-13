@@ -3,17 +3,29 @@ from aiogram.types import CallbackQuery, Message
 from aiogram.fsm.context import FSMContext
 from aiogram.enums import ParseMode
 from ...filters.roles import IsAdmin
-from ...keyboards.common import admin_tasks_root_kb, admin_tasks_list_kb, admin_pending_kb, admin_assignment_kb, admin_assignments_pending_kb
-from ...services.tasks import (
-    admin_list_all_tasks, admin_toggle_task_publised, admin_delete_task, approve_assignment, reject_assignment,
-    admin_create_task, seed_tasks_if_empty, list_submitted_assignments, list_pending_assignments, get_assignment_for_moderation, get_assignment_full, moderate_assignment
+from ...keyboards.common import (
+    admin_tasks_root_kb,
+    admin_tasks_list_kb,
+    admin_assignment_kb,
+    admin_assignments_pending_kb,
 )
-from ...states.tasks_admin import AdminTaskCreate
+from ...services.tasks import (
+    admin_list_all_tasks,
+    admin_toggle_task_publised,
+    admin_delete_task,
+    approve_assignment,
+    reject_assignment,
+    admin_create_task,
+    seed_tasks_if_empty,
+    list_pending_assignments,
+    get_assignment_for_moderation,
+    get_assignment_full,
+)
 from ...states.tasks import TaskCreateStates
-from ...utils.telegram import safe_edit_text
 
 
 router = Router(name="admin_tasks")
+
 
 # Debug
 @router.callback_query(F.data.startswith("admin:assign"))
@@ -24,18 +36,26 @@ async def debug_admin_assign(cb: CallbackQuery):
 # Вход в раздел
 @router.callback_query(IsAdmin(), F.data == "admin:tasks")
 async def admin_tasks_root(cb: CallbackQuery):
-    await cb.message.edit_text("📚 Управление заданиями", reply_markup=admin_tasks_root_kb())
+    await cb.message.edit_text(
+        "📚 Управление заданиями", reply_markup=admin_tasks_root_kb()
+    )
     await cb.answer()
+
 
 # Список
 @router.callback_query(IsAdmin(), F.data == "admin:tasks:list")
 async def admin_tasks_list(cb: CallbackQuery):
     items = admin_list_all_tasks()
     if not items:
-        await cb.message.edit_text("Заданий пока нет.", reply_markup=admin_tasks_root_kb())
+        await cb.message.edit_text(
+            "Заданий пока нет.", reply_markup=admin_tasks_root_kb()
+        )
         return await cb.answer()
-    await cb.message.edit_text("📋 Список заданий:", reply_markup=admin_tasks_list_kb(items))
+    await cb.message.edit_text(
+        "📋 Список заданий:", reply_markup=admin_tasks_list_kb(items)
+    )
     await cb.answer()
+
 
 # Тоггл публикации
 @router.callback_query(IsAdmin(), F.data.startswith("admin:tasks:toggle:"))
@@ -46,8 +66,11 @@ async def admin_tasks_toggle(cb: CallbackQuery):
         return await cb.answer("Задание не найдено", show_alert=True)
     # перерисуем список
     items = admin_list_all_tasks()
-    await cb.message.edit_text("📋 Список заданий:", reply_markup=admin_tasks_list_kb(items))
+    await cb.message.edit_text(
+        "📋 Список заданий:", reply_markup=admin_tasks_list_kb(items)
+    )
     await cb.answer("Статус обновлён")
+
 
 # Удаление
 @router.callback_query(IsAdmin(), F.data.startswith("admin:tasks:delete:"))
@@ -58,9 +81,13 @@ async def admin_tasks_delete(cb: CallbackQuery):
         return await cb.answer("Задание не найдено", show_alert=True)
     items = admin_list_all_tasks()
     if not items:
-        await cb.message.edit_text("Задание удалено. Список пуст.", reply_markup=admin_tasks_root_kb())
+        await cb.message.edit_text(
+            "Задание удалено. Список пуст.", reply_markup=admin_tasks_root_kb()
+        )
     else:
-        await cb.message.edit_text("📋 Список заданий:", reply_markup=admin_tasks_list_kb(items))
+        await cb.message.edit_text(
+            "📋 Список заданий:", reply_markup=admin_tasks_list_kb(items)
+        )
     await cb.answer("Удалено")
 
 
@@ -74,7 +101,9 @@ async def admin_assignments_pending(cb: CallbackQuery):
     if not items:
         await cb.answer("Нет заданий на модерации 👍", show_alert=True)
         # Можно вернуть в админку
-        await cb.message.edit_text("Всё чисто. Заданий на модерации нет.", reply_markup=admin_tasks_root_kb())
+        await cb.message.edit_text(
+            "Всё чисто. Заданий на модерации нет.", reply_markup=admin_tasks_root_kb()
+        )
         return
 
     lines = ["🧾 <b>Задания на модерации</b>"]
@@ -90,6 +119,7 @@ async def admin_assignments_pending(cb: CallbackQuery):
     )
     await cb.answer()
 
+
 @router.callback_query(F.data.startswith("admin:assign:open:"))
 async def admin_assign_open(cb: CallbackQuery):
     """
@@ -103,7 +133,9 @@ async def admin_assign_open(cb: CallbackQuery):
 
     ass = get_assignment_for_moderation(assignment_id)
     if not ass:
-        await cb.answer("Не нашёл это задание. Возможно, уже обработано.", show_alert=True)
+        await cb.answer(
+            "Не нашёл это задание. Возможно, уже обработано.", show_alert=True
+        )
         return
 
     user = ass["user_username"] or ass["user_tg_id"]
@@ -215,7 +247,9 @@ async def admin_assign_approve(cb: CallbackQuery):
 
     ok = approve_assignment(assignment_id)
     if not ok:
-        await cb.answer("Не удалось одобрить (возможно, уже обработано).", show_alert=True)
+        await cb.answer(
+            "Не удалось одобрить (возможно, уже обработано).", show_alert=True
+        )
         return
 
     await cb.answer("✅ Одобрено, монеты начислены!", show_alert=True)
@@ -223,7 +257,9 @@ async def admin_assign_approve(cb: CallbackQuery):
     # Перерисуем список оставшихся
     items = list_pending_assignments()
     if not items:
-        await cb.message.edit_text("🎉 Все задания проверены!", reply_markup=admin_tasks_root_kb())
+        await cb.message.edit_text(
+            "🎉 Все задания проверены!", reply_markup=admin_tasks_root_kb()
+        )
     else:
         # переиспользуем функцию
         await admin_assignments_pending(cb)
@@ -239,14 +275,18 @@ async def admin_assign_reject(cb: CallbackQuery):
 
     ok = reject_assignment(assignment_id)
     if not ok:
-        await cb.answer("Не удалось отклонить (возможно, уже обработано).", show_alert=True)
+        await cb.answer(
+            "Не удалось отклонить (возможно, уже обработано).", show_alert=True
+        )
         return
 
     await cb.answer("❌ Отклонено.", show_alert=True)
 
     items = list_pending_assignments()
     if not items:
-        await cb.message.edit_text("🎉 Все задания проверены!", reply_markup=admin_tasks_root_kb())
+        await cb.message.edit_text(
+            "🎉 Все задания проверены!", reply_markup=admin_tasks_root_kb()
+        )
     else:
         await admin_assignments_pending(cb)
 
@@ -258,9 +298,14 @@ async def admin_tasks_seed(cb: CallbackQuery):
     await cb.answer("Демо-набор проверен/засеян")
     items = admin_list_all_tasks()
     if not items:
-        await cb.message.edit_text("Не удалось создать демо-набор.", reply_markup=admin_tasks_root_kb())
+        await cb.message.edit_text(
+            "Не удалось создать демо-набор.", reply_markup=admin_tasks_root_kb()
+        )
     else:
-        await cb.message.edit_text("📋 Список заданий:", reply_markup=admin_tasks_list_kb(items))
+        await cb.message.edit_text(
+            "📋 Список заданий:", reply_markup=admin_tasks_list_kb(items)
+        )
+
 
 # Создание — шаги FSM
 @router.callback_query(F.data == "admin:tasks:add", IsAdmin())
@@ -281,6 +326,7 @@ async def admin_tasks_add_title(msg: Message, state: FSMContext):
     await state.update_data(title=title)
     await msg.answer("📝 Введите описание задания:")
     await state.set_state(TaskCreateStates.waiting_description)
+
 
 # Шаг 2 — описание
 @router.message(TaskCreateStates.waiting_description)
@@ -334,7 +380,7 @@ async def admin_tasks_add_deadline(msg: Message, state: FSMContext):
         description=description,
         reward=reward,
         deadline_days=deadline_days,
-        #deadline_hours=deadline_hours,
+        # deadline_hours=deadline_hours,
     )
 
     await msg.answer(
@@ -342,6 +388,7 @@ async def admin_tasks_add_deadline(msg: Message, state: FSMContext):
         f"Оно уже доступно в каталоге, сложность определена автоматически.",
         reply_markup=admin_tasks_root_kb(),
     )
+
 
 @router.callback_query(IsAdmin(), F.data.startswith("admin:tasks:nop:"))
 async def admin_tasks_noop(cb: CallbackQuery):

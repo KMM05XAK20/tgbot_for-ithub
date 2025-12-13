@@ -2,6 +2,7 @@ import pytest
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
+
 @pytest.mark.asyncio
 async def test_broadcast_send_ok(mocker):
     from bot.handlers.admin.broadcast import broadcast_send

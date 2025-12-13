@@ -9,7 +9,6 @@ from ...services.tasks import (
     get_active_assignment,
     submit_task,
     has_active_assignment,
-    get_task,
 )
 from ...keyboards.common import main_menu_kb, task_view_kb
 

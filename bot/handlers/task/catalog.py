@@ -1,8 +1,18 @@
 from aiogram import Router, F
 from aiogram.types import CallbackQuery
 from aiogram.enums import ParseMode
-from ...services.tasks import list_tasks, list_public_tasks, get_task, take_task,  has_active_assignment, seed_tasks_if_empty, get_active_assignment
-from ...keyboards.common import tasks_filters_kb, tasks_catalog_kb, task_view_kb, task_details_kb, main_menu_kb
+from ...services.tasks import (
+    list_public_tasks,
+    get_task,
+    take_task,
+    has_active_assignment,
+)
+from ...keyboards.common import (
+    tasks_filters_kb,
+    tasks_catalog_kb,
+    task_view_kb,
+    task_details_kb,
+)
 from ...utils.telegram import safe_edit_text
 from ...storage.models import Task
 
@@ -44,14 +54,16 @@ def render_tasks_list(tasks: list[Task], title: str = "📚 Каталог за�
 
     return "\n\n".join(lines)
 
+
 def difficulty_label(diff: str | None) -> str:
     mapping = {
-    "easy": "🟢 Лёгкое",
-    "medium": "🟡 Среднее",
-    "hard": "🔴 Сложное",
+        "easy": "🟢 Лёгкое",
+        "medium": "🟡 Среднее",
+        "hard": "🔴 Сложное",
     }
 
     return mapping.get((diff or "").lower(), "⚪ Без категории")
+
 
 def render_task_card(t: Task) -> str:
     """
@@ -93,12 +105,7 @@ async def open_tasks_root(cb: CallbackQuery):
     text = render_tasks_list(tasks, title="📚 Каталог заданий")
     kb = tasks_catalog_kb(tasks)
 
-    await safe_edit_text(
-        cb.message,
-        text,
-        reply_markup=kb,
-        parse_mode=ParseMode.HTML
-    )
+    await safe_edit_text(cb.message, text, reply_markup=kb, parse_mode=ParseMode.HTML)
     await cb.answer()
 
 
@@ -163,6 +170,7 @@ async def filter_tasks(cb: CallbackQuery):
     )
     await cb.answer()
 
+
 @router.callback_query(F.data.startswith("task:view:"))
 async def view_task(cb: CallbackQuery):
     task_id = int(cb.data.split(":")[2])
@@ -170,25 +178,28 @@ async def view_task(cb: CallbackQuery):
     if not t:
         await cb.answer("Задание не найдено")
         return
-    
+
     title = getattr(t, "title", getattr(t, "name", f"task #{task_id}"))
     reward = getattr(t, "reward", getattr(t, "coins", "—"))
     deadline_text = getattr(t, "deadline_text", "—")
     description = getattr(t, "description", "Без описания")
 
-    
     text = (
         f"📱 <b>{title}</b>\n"
         f"💰 Награда: {reward} coins\n"
         f"⏱ Дедлайн: {deadline_text}\n\n"
         f"{description}"
     )
-    await cb.message.edit_text(text, reply_markup=task_details_kb(task_id), parse_mode=ParseMode.HTML)
+    await cb.message.edit_text(
+        text, reply_markup=task_details_kb(task_id), parse_mode=ParseMode.HTML
+    )
     await cb.answer()
 
 
 def _difficulty_title(code: str) -> str:
-    return {"easy": "🟢 Легкие", "medium": "🟡 Средние", "hard": "🔴 Сложные"}.get(code, "🗂 Все")
+    return {"easy": "🟢 Легкие", "medium": "🟡 Средние", "hard": "🔴 Сложные"}.get(
+        code, "🗂 Все"
+    )
 
 
 @router.callback_query(F.data == "tasks:filter:easy")
@@ -213,6 +224,7 @@ async def tasks_hard(cb: CallbackQuery):
     text = render_tasks_list(tasks, title="🔴 Сложные задания")
     await cb.message.edit_text(text, reply_markup=tasks_filters_kb())
     await cb.answer()
+
 
 # @router.callback_query(F.data.startswith("tasks:view:"))
 # async def view_task(cb: CallbackQuery):
@@ -249,7 +261,6 @@ async def tasks_hard(cb: CallbackQuery):
 #     )
 #     await cb.message.edit_text(text, reply_markup=task_details_kb(t.id))
 #     await cb.answer()
-
 
 
 @router.callback_query(F.data.startswith("tasks:take:"))
@@ -289,6 +300,7 @@ async def take_task_cb(cb: CallbackQuery):
         reply_markup=task_view_kb(task_id, already_taken=True),
     )
     await cb.answer("Задание добавлено в твои активные ✅")
+
 
 # @router.callback_query()
 # async def debug_all_callback(cb: CallbackQuery):

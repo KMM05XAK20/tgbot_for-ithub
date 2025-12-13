@@ -16,6 +16,7 @@ router = Router(name="menu")
 #     "help": "⚙️ Помощь\nFAQ и контакты — позже.",
 # }
 
+
 @router.callback_query(F.data == "menu:open:main")
 async def open_main_menu(cb: CallbackQuery):
     text = (
@@ -38,7 +39,8 @@ async def open_main_menu(cb: CallbackQuery):
 #     await cb.message.edit_text(text + "\n\n⬅️ Вернуться в главное меню:", reply_markup=main_menu_kb())
 #     await cb.answer()
 
+
 @router.message(Command("cancel"))
-async def cancel_any(message:Message, state:FSMContext):
+async def cancel_any(message: Message, state: FSMContext):
     await state.clear()
     await message.answer("Отменил. Возвращаю в главное меню", reply_markup=main_menu_kb)

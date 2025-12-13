@@ -7,15 +7,29 @@ from datetime import datetime, timedelta
 from ...filters.roles import IsAdmin
 from ...storage.db import SessionLocal
 from ...storage.models import User as UserModel
-from ...keyboards.common import admin_panel_kb, admin_pending_kb, admin_assignment_kb, admin_mentors_root_kb, mentor_role_kb
-from ...services.users import find_user, get_or_create_user, set_user_role, set_admin_status, get_recent_users
+from ...keyboards.common import (
+    admin_panel_kb,
+    admin_pending_kb,
+    admin_assignment_kb,
+    admin_mentors_root_kb,
+    mentor_role_kb,
+)
+from ...services.users import (
+    find_user,
+    get_or_create_user,
+    set_user_role,
+    set_admin_status,
+    get_recent_users,
+)
 from ...services.mentorship import get_mentor_list
 from ...states.mentorship import AdminMentorAdd, AdminMentorRemove
 from ...services.levels import level_by_coins
 from ...services.badges import newly_unlocked_badge
 from ...services.tasks import (
-    list_pending_submissions, get_assignment_full,
-    approve_assignment, reject_assignment
+    list_pending_submissions,
+    get_assignment_full,
+    approve_assignment,
+    reject_assignment,
 )
 from ...services.calendar import create_event
 from ...config import get_settings
@@ -24,10 +38,14 @@ router = Router(name="admin_panel")
 
 # /whoami в start.py — ок
 
+
 # Вход в админку (команда с фильтром IsAdmin)
 @router.message(Command("admin"), IsAdmin())
 async def admin_entry(msg: Message):
-    await msg.answer("🛠 <b>Админ-панель</b>\nВыберите раздел:", reply_markup=admin_panel_kb())
+    await msg.answer(
+        "🛠 <b>Админ-панель</b>\nВыберите раздел:", reply_markup=admin_panel_kb()
+    )
+
 
 # Список «на проверке»
 @router.callback_query(F.data.startswith("admin:pending:"), IsAdmin())
@@ -35,18 +53,29 @@ async def admin_pending(cb: CallbackQuery):
     page = int(cb.data.split(":")[-1])
     rows = list_pending_submissions(page=page, per_page=10)
     if not rows:
-        await cb.message.edit_text("🕒 На проверке пусто.", reply_markup=admin_pending_kb(page))
+        await cb.message.edit_text(
+            "🕒 На проверке пусто.", reply_markup=admin_pending_kb(page)
+        )
         return await cb.answer()
 
     lines = []
     for aid, title, tg_id, username, submitted_at in rows:
         user = f"@{username}" if username else str(tg_id)
         when = submitted_at.strftime("%Y-%m-%d %H:%M") if submitted_at else "—"
-        lines.append(f"• <a href='tg://user?id={tg_id}'>[{user}]</a> — <b>{title}</b> — id:{aid} — {when}")
+        lines.append(
+            f"• <a href='tg://user?id={tg_id}'>[{user}]</a> — <b>{title}</b> — id:{aid} — {when}"
+        )
 
-    text = "🕒 <b>На проверке</b>\n" + "\n".join(lines) + "\n\nОткрой карточку: напиши в чат <code>admin:view:&lt;id&gt;</code>"
-    await cb.message.edit_text(text, reply_markup=admin_pending_kb(page), disable_web_page_preview=True)
+    text = (
+        "🕒 <b>На проверке</b>\n"
+        + "\n".join(lines)
+        + "\n\nОткрой карточку: напиши в чат <code>admin:view:&lt;id&gt;</code>"
+    )
+    await cb.message.edit_text(
+        text, reply_markup=admin_pending_kb(page), disable_web_page_preview=True
+    )
     await cb.answer()
+
 
 @router.message(IsAdmin(), Command("add_admin"))
 async def add_admin(msg: Message):
@@ -59,15 +88,15 @@ async def add_admin(msg: Message):
     with SessionLocal() as s:
         user = s.query(UserModel).filter_by(tg_id=tg_id).first()
         if not user:
-            user = UserModel(
-                tg_id=tg_id,
-                username=target.username
-            )
+            user = UserModel(tg_id=tg_id, username=target.username)
             s.add(user)
         user.is_admin = True
         s.commit()
 
-    await msg.answer(f"✅ Пользователь @{target.username or tg_id} теперь администратор.")
+    await msg.answer(
+        f"✅ Пользователь @{target.username or tg_id} теперь администратор."
+    )
+
 
 @router.message(IsAdmin(), Command("del_admin"))
 async def del_admin(msg: Message):
@@ -78,6 +107,7 @@ async def del_admin(msg: Message):
     tg_id = target.id
 
     from ...config import get_settings
+
     settings = get_settings()
     super_ids = set(settings.admin_ids or [])
 
@@ -112,6 +142,7 @@ async def admin_grant(cb: CallbackQuery):
     await cb.answer("Пользователь теперь админ!", show_alert=True)
     await cb.message.edit_text("Админка выдана.")
 
+
 # Просмотр карточки по текстовой команде: admin:view:<id>
 @router.message(F.text.startswith("admin:view:"), IsAdmin())
 async def admin_view_by_text(msg: Message):
@@ -128,8 +159,14 @@ async def create_event_cmd(msg: types.Message):
     title = "Пример события"
     description = "Описание события"
     event_date = datetime.utcnow() + timedelta(days=2)  # через 2 дня
-    create_event(user_id=msg.from_user.id, title=title, description=description, event_date=event_date)
+    create_event(
+        user_id=msg.from_user.id,
+        title=title,
+        description=description,
+        event_date=event_date,
+    )
     await msg.answer(f"Событие '{title}' успешно создано!")
+
 
 # Просмотр карточки (если позже сделаешь inline-кнопку admin:view:<id>)
 @router.callback_query(F.data.startswith("admin:view:"), IsAdmin())
@@ -137,6 +174,7 @@ async def admin_view_cb(cb: CallbackQuery):
     aid = int(cb.data.split(":")[-1])
     await show_assignment_card(cb.message, aid)
     await cb.answer()
+
 
 async def show_assignment_card(target: Message, assignment_id: int):
     a = get_assignment_full(assignment_id)
@@ -156,7 +194,10 @@ async def show_assignment_card(target: Message, assignment_id: int):
         f"🖼️ Фото приложено: {file_note}\n"
         f"Статус: <b>{a.status}</b>"
     )
-    await target.answer(text, reply_markup=admin_assignment_kb(a.id), disable_web_page_preview=True)
+    await target.answer(
+        text, reply_markup=admin_assignment_kb(a.id), disable_web_page_preview=True
+    )
+
 
 # Approve
 @router.callback_query(F.data.startswith("admin:approve:"), IsAdmin())
@@ -189,23 +230,24 @@ async def admin_approve(cb: CallbackQuery):
         # базовое уведомление
         await cb.bot.send_message(
             user_after.tg_id,
-            f"✅ Ваше задание <b>{a_after.task.title}</b> проверено. Начислено <b>+{a_after.task.reward_coins}</b> coins!"
+            f"✅ Ваше задание <b>{a_after.task.title}</b> проверено. Начислено <b>+{a_after.task.reward_coins}</b> coins!",
         )
         # если ап — отдельное сообщение
         if lvl_after > lvl_before:
             await cb.bot.send_message(
                 user_after.tg_id,
-                f"🎉 <b>Level up!</b>\nТеперь у вас <b>Level {lvl_after}</b>."
+                f"🎉 <b>Level up!</b>\nТеперь у вас <b>Level {lvl_after}</b>.",
             )
 
             badges = newly_unlocked_badge(lvl_before, lvl_after)
             if badges:
                 await cb.bot.send_message(
                     user_after.tg_id,
-                    f"{badges.icon} <b>Badges unlocked:<b> {badges.title}"
+                    f"{badges.icon} <b>Badges unlocked:<b> {badges.title}",
                 )
     except Exception:
         pass
+
 
 # Reject
 @router.callback_query(F.data.startswith("admin:reject:"), IsAdmin())
@@ -220,7 +262,7 @@ async def admin_reject(cb: CallbackQuery):
     try:
         await cb.bot.send_message(
             a.user.tg_id,
-            f"❌ Ваше задание <b>{a.task.title}</b> отклонено.\nПопробуйте ещё раз — уточните детали и пришлите новый вариант."
+            f"❌ Ваше задание <b>{a.task.title}</b> отклонено.\nПопробуйте ещё раз — уточните детали и пришлите новый вариант.",
         )
     except Exception:
         pass
@@ -232,8 +274,11 @@ async def admin_reject(cb: CallbackQuery):
 # Вход в раздел управления менторами
 @router.callback_query(IsAdmin(), F.data == "admin:mentors")
 async def admin_mentors_root(cb: CallbackQuery):
-    await cb.message.edit_text("🧑‍🏫 Управление менторами", reply_markup=admin_mentors_root_kb())
+    await cb.message.edit_text(
+        "🧑‍🏫 Управление менторами", reply_markup=admin_mentors_root_kb()
+    )
     await cb.answer()
+
 
 # Кнопка назад в общий админ-панель
 @router.callback_query(IsAdmin(), F.data == "admin:panel")
@@ -246,8 +291,11 @@ async def admin_panel_home(cb: CallbackQuery):
 @router.callback_query(IsAdmin(), F.data == "admin:mentors:add")
 async def mentor_add_start(cb: CallbackQuery, state: FSMContext):
     await state.set_state(AdminMentorAdd.waiting_identifier)
-    await cb.message.edit_text("Отправь @username или tg_id пользователя, которого сделать ментором.")
+    await cb.message.edit_text(
+        "Отправь @username или tg_id пользователя, которого сделать ментором."
+    )
     await cb.answer()
+
 
 # ➕ Добавить ментора — шаг 2: принять идентификатор и спросить роль
 @router.message(IsAdmin(), AdminMentorAdd.waiting_identifier)
@@ -259,11 +307,15 @@ async def mentor_add_got_identifier(msg: Message, state: FSMContext):
         if ident.isdigit():
             u = get_or_create_user(int(ident))
         else:
-            await msg.answer("Не нашёл пользователя. Пришли @username или цифровой tg_id.")
+            await msg.answer(
+                "Не нашёл пользователя. Пришли @username или цифровой tg_id."
+            )
             return
     await state.update_data(tg_id=u.tg_id)
-    await msg.answer(f"Найден пользователь: @{u.username or '—'} (id={u.tg_id}). Выбери роль:",
-                     reply_markup=mentor_role_kb(u.tg_id))
+    await msg.answer(
+        f"Найден пользователь: @{u.username or '—'} (id={u.tg_id}). Выбери роль:",
+        reply_markup=mentor_role_kb(u.tg_id),
+    )
 
 
 # обработчик кнопок выбора роли
@@ -276,8 +328,12 @@ async def mentor_set_role(cb: CallbackQuery, state: FSMContext):
         await cb.answer("Пользователь не найден")
         return
     await state.clear()
-    await cb.message.edit_text(f"✅ Назначен ментор: id={tg_id}, роль={role}", reply_markup=admin_mentors_root_kb())
+    await cb.message.edit_text(
+        f"✅ Назначен ментор: id={tg_id}, роль={role}",
+        reply_markup=admin_mentors_root_kb(),
+    )
     await cb.answer()
+
 
 # 🗑 Удалить ментора — шаг 1
 @router.callback_query(IsAdmin(), F.data == "admin:mentors:remove")
@@ -285,7 +341,6 @@ async def mentor_remove_start(cb: CallbackQuery, state: FSMContext):
     await state.set_state(AdminMentorRemove.waiting_identifier)
     await cb.message.edit_text("Отправь @username или tg_id, чтобы снять роль ментора.")
     await cb.answer()
-
 
 
 # 🗑 Удалить ментора — шаг 2
@@ -298,21 +353,29 @@ async def mentor_remove_got_identifier(msg: Message, state: FSMContext):
         return
     set_user_role(u.tg_id, None)
     await state.clear()
-    await msg.answer(f"✅ Роль ментора снята: @{u.username or '—'} (id={u.tg_id})",
-                     reply_markup=admin_mentors_root_kb())
+    await msg.answer(
+        f"✅ Роль ментора снята: @{u.username or '—'} (id={u.tg_id})",
+        reply_markup=admin_mentors_root_kb(),
+    )
+
 
 # 📋 Список менторов
 @router.callback_query(IsAdmin(), F.data == "admin:mentors:list")
 async def mentor_list_view(cb: CallbackQuery):
     mentors = get_mentor_list()
     if not mentors:
-        await cb.message.edit_text("Пока нет менторов.", reply_markup=admin_mentors_root_kb())
+        await cb.message.edit_text(
+            "Пока нет менторов.", reply_markup=admin_mentors_root_kb()
+        )
         return await cb.answer()
     lines = []
     for m in mentors:
         title = f"@{m.username}" if m.username else f"id={m.tg_id}"
         lines.append(f"• {title} — {m.role}")
-    await cb.message.edit_text("📋 Список менторов:\n\n" + "\n".join(lines), reply_markup=admin_mentors_root_kb())
+    await cb.message.edit_text(
+        "📋 Список менторов:\n\n" + "\n".join(lines),
+        reply_markup=admin_mentors_root_kb(),
+    )
     await cb.answer()
 
 
@@ -332,7 +395,9 @@ async def make_admin_handler(msg: Message):
 
     parts = msg.text.split()
     if len(parts) != 2:
-        await msg.answer("Использование: /make_admin <telegram_id>\nПример: /make_admin 8007710555")
+        await msg.answer(
+            "Использование: /make_admin <telegram_id>\nПример: /make_admin 8007710555"
+        )
         return
 
     try:
@@ -374,9 +439,7 @@ async def last_users_handler(msg: Message):
     for u in users:
         admin_flag = "🛡" if getattr(u, "is_admin", False) else "—"
         uname = f"@{u.username}" if u.username else "—"
-        lines.append(
-            f"{admin_flag} {u.tg_id} · {uname} · {u.role or '—'}"
-        )
+        lines.append(f"{admin_flag} {u.tg_id} · {uname} · {u.role or '—'}")
 
     text = "👥 <b>Последние пользователи</b>:\n" + "\n".join(lines)
     await msg.answer(text)

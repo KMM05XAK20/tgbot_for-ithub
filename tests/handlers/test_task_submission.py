@@ -3,11 +3,14 @@ from unittest.mock import AsyncMock
 
 from tests.conftest import state
 
+
 @pytest.mark.asyncio
 async def test_submit_start_no_assignment_shows_alert(cb, mocker):
     from bot.handlers.task.submission import submit_start
 
-    mocker.patch("bot.handlers.task.submission.get_active_assignment", return_value=None)
+    mocker.patch(
+        "bot.handlers.task.submission.get_active_assignment", return_value=None
+    )
 
     # safe_edit_text/answer могут быть внутри, поэтому подстрахуем
     cb.answer = AsyncMock()

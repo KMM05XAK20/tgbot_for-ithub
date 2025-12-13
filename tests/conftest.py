@@ -2,8 +2,10 @@ from types import SimpleNamespace
 import pytest
 from unittest.mock import AsyncMock
 
+
 class FakeUser(SimpleNamespace):
     pass
+
 
 @pytest.fixture
 def msg():
@@ -16,6 +18,7 @@ def msg():
         chat=SimpleNamespace(id=222),
         bot=SimpleNamespace(send_message=AsyncMock()),
     )
+
 
 @pytest.fixture
 def cb():
@@ -31,6 +34,7 @@ def cb():
         message=m,
         answer=AsyncMock(),
     )
+
 
 @pytest.fixture
 def state():

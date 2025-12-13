@@ -22,11 +22,9 @@ root_router.include_routers(
     calendar.router,
     help.router,
     debug.router,
-
     # задания (каталог/сдача)
     catalog.router,
     submission.router,
-
     # админка
     panel.router,
     tasks.router,

@@ -6,14 +6,17 @@ from ..services.rating import get_leaderboard, get_user_position
 
 router = Router(name="rating")
 
+
 @router.message(Command("rating"))
 async def rating_cmd(msg: Message):
     await send_rating(msg)
+
 
 @router.callback_query(F.data == "menu:open:rating")
 async def rating_open(cb: CallbackQuery):
     await send_rating(cb.message)
     await cb.answer()
+
 
 async def send_rating(target: Message):
     top = get_leaderboard(10)

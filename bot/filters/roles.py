@@ -1,9 +1,10 @@
 from aiogram.filters import BaseFilter
-from aiogram.types import Message, CallbackQuery
+from aiogram.types import Message
 
 from ..config import get_settings
 from ..storage.db import SessionLocal
 from ..storage.models import User as UserModel
+
 
 class IsAdmin(BaseFilter):
     def __init__(self):
@@ -16,7 +17,7 @@ class IsAdmin(BaseFilter):
 
         if tg_id in self.super_admin_ids:
             return True
-        
+
         with SessionLocal() as s:
             user = s.query(UserModel).filter_by(tg_id=tg_id).first()
             return bool(user and user.is_admin)

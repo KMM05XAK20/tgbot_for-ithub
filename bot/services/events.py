@@ -28,8 +28,8 @@ def create_event(
         ev = Event(
             title=title,
             description=description,
-            event_date=event_dt,   # ВАЖНО: имя поля в модели Event
-            user_id=user_id,       # а НЕ creator_tg_id
+            event_date=event_dt,  # ВАЖНО: имя поля в модели Event
+            user_id=user_id,  # а НЕ creator_tg_id
         )
         s.add(ev)
         s.commit()
@@ -40,15 +40,10 @@ def create_event(
 def list_events(limit: int = 10) -> list[Event]:
     """Получить ближайшие события (по дате)."""
     with SessionLocal() as s:
-        return (
-            s.query(Event)
-            .order_by(Event.event_date.asc())
-            .limit(limit)
-            .all()
-        )
+        return s.query(Event).order_by(Event.event_date.asc()).limit(limit).all()
+
 
 def list_upcoming_events(limit: int = 10) -> list[Event]:
-
     now = datetime.utcnow()
 
     with SessionLocal() as s:

@@ -4,18 +4,38 @@ from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command
 from ..services.users import get_user_by_username
 from ..services.tasks import get_user
-from ..keyboards.common import profile_kb, main_menu_kb, profile_history_filters_kb, profile_history_list_kb, profile_assignment_kb
-from ..services.tasks import count_assignments_by_status, list_assignments, get_assignment_card, reward_to_difficulty
-from ..services.levels import level_by_coins, render_progress_bar
-from ..services.badges import render_badges_line
-from ..services.rating import get_user_position
+from ..keyboards.common import (
+    profile_kb,
+    profile_history_filters_kb,
+    profile_history_list_kb,
+    profile_assignment_kb,
+)
+from ..services.tasks import (
+    count_assignments_by_status,
+    list_assignments,
+    get_assignment_card,
+    reward_to_difficulty,
+)
 
 router = Router(name="profile")
 
-def _group_title(group: str) -> str:
-    return {"active": "Активные", "submitted": "На проверке", "done": "Завершённые"}.get(group, "Активные")
 
-def _profile_card(username: str | None, role: str | None, coins: int, position: int | None, badges: list[str], created_at) -> str:
+def _group_title(group: str) -> str:
+    return {
+        "active": "Активные",
+        "submitted": "На проверке",
+        "done": "Завершённые",
+    }.get(group, "Активные")
+
+
+def _profile_card(
+    username: str | None,
+    role: str | None,
+    coins: int,
+    position: int | None,
+    badges: list[str],
+    created_at,
+) -> str:
     name_line = f"<b>@{username}</b>" if username else "<b>без никнейма</b>"
     pos_line = f"{position} место" if position is not None else "—"
     badges_line = " • ".join(badges) if badges else "пока нет — всё впереди 🙂"
@@ -36,7 +56,7 @@ def _profile_card(username: str | None, role: str | None, coins: int, position: 
 @router.message(Command("profile"))
 async def open_profile(msg: Message):
     user_id = msg.from_user.id
-    
+
     # Получаем профиль пользователя
     profile_data = get_user_by_username(user_id)  # Извлекаем данные из базы данных
     badges = get_user(user_id)  # Получаем бейджи пользователя
@@ -59,9 +79,10 @@ def _role_title(role: str) -> str:
     roles = {
         "admin": "Админ",
         "mentor": "Наставник",
-        "user":"Пользователь",
+        "user": "Пользователь",
     }
     return roles.get(role, "Неизвестная роль")
+
 
 @router.callback_query(F.data == "profile:history")
 async def profile_history_root(cb: CallbackQuery):
@@ -76,6 +97,7 @@ async def profile_history_root(cb: CallbackQuery):
     await cb.message.edit_text(text, reply_markup=profile_history_filters_kb(counts))
     await cb.answer()
 
+
 # список по группе с пагинацией
 @router.callback_query(F.data.startswith("profile:history:list:"))
 async def profile_history_list(cb: CallbackQuery):
@@ -84,9 +106,15 @@ async def profile_history_list(cb: CallbackQuery):
     page = max(1, int(parts[4]))
     diff = parts[5] if len(parts) > 5 else "all"
 
-    rows = list_assignments(cb.from_user.id, group=group, page=page, per_page=10, diff=diff)
+    rows = list_assignments(
+        cb.from_user.id, group=group, page=page, per_page=10, diff=diff
+    )
 
-    group_title = {"active": "Активные", "submitted": "На проверке", "done": "Завершённые"}.get(group, "Активные")
+    group_title = {
+        "active": "Активные",
+        "submitted": "На проверке",
+        "done": "Завершённые",
+    }.get(group, "Активные")
 
     if not rows:
         text = f"📜 <b>{group_title}</b> · сложность: {diff}\nПока пусто."
@@ -100,8 +128,17 @@ async def profile_history_list(cb: CallbackQuery):
 
     lines = [f"📜 <b>{group_title}</b> · сложность: {diff} (стр. {page})", ""]
     for aid, title, status, reward, due_at, submitted_at in rows:
-        when = due_at.strftime("%Y-%m-%d %H:%M") if due_at else (submitted_at.strftime("%Y-%m-%d %H:%M") if submitted_at else "—")
-        mark = {"in_progress": "🚧", "submitted": "🕒", "approved": "✅", "rejected": "❌"}.get(status, "•")
+        when = (
+            due_at.strftime("%Y-%m-%d %H:%M")
+            if due_at
+            else (submitted_at.strftime("%Y-%m-%d %H:%M") if submitted_at else "—")
+        )
+        mark = {
+            "in_progress": "🚧",
+            "submitted": "🕒",
+            "approved": "✅",
+            "rejected": "❌",
+        }.get(status, "•")
         dmark = diff_icon(reward)
         lines.append(f"{mark} {dmark} <b>{title}</b> — {reward}c — {when} — id:{aid}")
     lines.append("")
@@ -126,7 +163,9 @@ async def _safe_edit(message, text: str, reply_markup=None):
             return
     # 2) иначе обновляем и текст, и клавиатуру
     try:
-        await message.edit_text(text, reply_markup=reply_markup, disable_web_page_preview=True)
+        await message.edit_text(
+            text, reply_markup=reply_markup, disable_web_page_preview=True
+        )
     except TelegramBadRequest as e:
         if "message is not modified" in str(e):
             # На всякий случай ещё раз попробуем обновить только клавиатуру
@@ -145,6 +184,7 @@ async def profile_assign_view_cb(cb: CallbackQuery):
     aid = int(cb.data.split(":")[-1])
     await _send_assignment_card(cb, aid, group="active", page=1)  # дефолты
 
+
 @router.message(F.text.startswith("my:assign:view:"))
 async def profile_assign_view_cmd(msg):
     try:
@@ -154,17 +194,30 @@ async def profile_assign_view_cmd(msg):
     # без контекста группы/страницы покажем базово
     await _send_assignment_card(msg, aid, group="active", page=1)
 
+
 async def _send_assignment_card(target, assignment_id: int, group: str, page: int):
     a = get_assignment_card(assignment_id)
     if not a:
         if hasattr(target, "answer"):
             return await target.answer("Заявка не найдена.")
         return
-    
 
-    when = a["due_at"].strftime("%Y-%m-%d %H:%M") if a["due_at"] else (a["submitted_at"].strftime("%Y-%m-%d %H:%M") if a["submitted_at"] else "—")
-    mark = {"in_progress": "🚧", "submitted": "🕒", "approved": "✅", "rejected": "❌"}.get(a["status"], "•")
-    dmark = {"easy":"🟢","medium":"🟡","hard":"🔴"}[reward_to_difficulty(a["reward"])]
+    when = (
+        a["due_at"].strftime("%Y-%m-%d %H:%M")
+        if a["due_at"]
+        else (
+            a["submitted_at"].strftime("%Y-%m-%d %H:%M") if a["submitted_at"] else "—"
+        )
+    )
+    mark = {
+        "in_progress": "🚧",
+        "submitted": "🕒",
+        "approved": "✅",
+        "rejected": "❌",
+    }.get(a["status"], "•")
+    dmark = {"easy": "🟢", "medium": "🟡", "hard": "🔴"}[
+        reward_to_difficulty(a["reward"])
+    ]
     sub = a["submission_text"] or "(нет текста)"
     file_note = "да" if a["has_file"] else "нет"
 
@@ -179,4 +232,8 @@ async def _send_assignment_card(target, assignment_id: int, group: str, page: in
     )
 
     # target может быть Message или CallbackQuery.message — используем .answer()
-    await target.answer(text, reply_markup=profile_assignment_kb(a['id'], group, page), disable_web_page_preview=True)
+    await target.answer(
+        text,
+        reply_markup=profile_assignment_kb(a["id"], group, page),
+        disable_web_page_preview=True,
+    )

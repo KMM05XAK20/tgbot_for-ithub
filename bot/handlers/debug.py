@@ -21,7 +21,7 @@ async def whoime(msg: Message):
 
     role = getattr(user, "role", None) if user else None
     coins = getattr(user, "coins", 0) if user else 0
-    
+
     if super_admin:
         admin_text = "супер-админ"
     elif db_admin:

@@ -1,4 +1,3 @@
-
 from aiogram import Router
 from aiogram.filters import Command
 from aiogram.types import Message
@@ -26,7 +25,9 @@ async def add_admin_by_reply(msg: Message):
 
     # 2. Проверяем, что команда отправлена ответом на сообщение
     if not msg.reply_to_message or not msg.reply_to_message.from_user:
-        await msg.answer("Использование: ответь на сообщение пользователя командой /add_admin.")
+        await msg.answer(
+            "Использование: ответь на сообщение пользователя командой /add_admin."
+        )
         return
 
     target = msg.reply_to_message.from_user
@@ -49,8 +50,7 @@ async def add_admin_by_reply(msg: Message):
     # 5. Уведомление самому пользователю (если хочешь)
     try:
         await msg.bot.send_message(
-            target_tg_id,
-            "🛡 Тебе выдали права администратора в боте INFLUENCE.HUB."
+            target_tg_id, "🛡 Тебе выдали права администратора в боте INFLUENCE.HUB."
         )
     except Exception:
         # Если пользователь запретил ЛС — просто молча игнорируем

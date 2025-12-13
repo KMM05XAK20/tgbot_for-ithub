@@ -87,7 +87,9 @@ async def test_admin_event_time_valid(mocker, msg, state):
     }
 
     create_event_mock = mocker.patch("bot.handlers.admin.events.create_event")
-    kb_mock = mocker.patch("bot.handlers.admin.events.admin_events_kb", return_value=admin_events_kb())
+    kb_mock = mocker.patch(
+        "bot.handlers.admin.events.admin_events_kb", return_value=admin_events_kb()
+    )
 
     msg.text = "18:30"
     msg.from_user.id = 777

@@ -32,6 +32,7 @@ async def open_help_menu(cb: CallbackQuery):
     await cb.message.edit_text(HELP_TEXT, reply_markup=main_menu_kb())
     await cb.answer()
 
+
 @router.message(Command("help"))
 async def help_command(msg: Message):
     await msg.answer(HELP_TEXT, reply_markup=main_menu_kb())
@@ -56,6 +57,7 @@ async def whoime(msg: Message):
         await msg.answer(text, reply_markup=admin_grant_kb(msg.from_user.id))
     else:
         await msg.answer(text)
+
 
 @router.message(Command("help"))
 async def help_command(msg: Message):

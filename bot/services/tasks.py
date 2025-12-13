@@ -1,9 +1,6 @@
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-from typing import Iterable, Optional
+from typing import Optional
 from sqlalchemy import select, func, and_, or_
-from sqlalchemy.orm import Session
 from sqlalchemy.orm import joinedload
-from .users import get_user
 from ..storage.db import SessionLocal
 from ..storage.models import Task, TaskAssignment, User
 from datetime import datetime, timedelta
@@ -11,6 +8,7 @@ import logging
 
 
 log = logging.getLogger(__name__)
+
 
 def reward_to_difficulty(reward: int) -> str:
     """
@@ -41,14 +39,13 @@ def difficulty_condition(diff: str):
     return None  # all
 
 
-
 def admin_create_task(
     *,
     title: str,
     description: str,
     reward: int,
     deadline_days: int,
-    difficulty: str | None = None,   # <-- теперь НЕобязательный
+    difficulty: str | None = None,  # <-- теперь НЕобязательный
 ) -> int:
     """
     Создание задачи из-под админки.
@@ -61,7 +58,7 @@ def admin_create_task(
         t = Task(
             title=title,
             description=description,
-            reward_coins=reward,   # если у тебя поле называется reward_coins
+            reward_coins=reward,  # если у тебя поле называется reward_coins
             difficulty=difficulty,
             deadline_days=deadline_days,
             status="active",
@@ -71,7 +68,8 @@ def admin_create_task(
         s.commit()
         s.refresh(t)
         return t.id
-    
+
+
 # def admin_create_task(*, title: str, description: str, reward: int, difficulty: str, deadline_days: int) -> int:
 #     """difficulty: easy|medium|hard; deadline_days >= 0"""
 #     with SessionLocal() as s:
@@ -89,6 +87,7 @@ def admin_create_task(
 #         s.refresh(t)
 #         return t.id
 
+
 def admin_delete_task(task_id: int) -> bool:
     with SessionLocal() as s:
         t = s.query(Task).filter(Task.id == task_id).first()
@@ -103,8 +102,9 @@ def admin_list_all_tasks():
     with SessionLocal() as s:
         return s.query(Task).order_by(Task.id.desc()).all()
 
+
 def admin_toggle_task_publised(task_id: int) -> bool:
-    fm =  _task_field_map()
+    fm = _task_field_map()
     pub_f = fm.get("published")
     if not pub_f:
         return False
@@ -115,6 +115,7 @@ def admin_toggle_task_publised(task_id: int) -> bool:
         setattr(t, pub_f, not bool(getattr(t, pub_f)))
         s.commit()
         return True
+
 
 # определение сложности задачи
 def classify_difficulty(reward: int) -> str:
@@ -154,6 +155,7 @@ def submit_assignment_text(assignment_id: int, text: str) -> bool:
         s.commit()
         return True
 
+
 def submit_assignment_file(assignment_id: int, file_id: str) -> bool:
     with SessionLocal() as s:
         a = s.get(TaskAssignment, assignment_id)
@@ -166,14 +168,29 @@ def submit_assignment_file(assignment_id: int, file_id: str) -> bool:
         return True
 
 
-
 def _task_field_map() -> dict[str, str | None]:
     title = "title" if hasattr(Task, "title") else None
     description = "description" if hasattr(Task, "description") else None
-    reward = "reward" if hasattr(Task, "reward") else ("coins" if hasattr(Task, "coins") else None)
-    difficulty = "difficulty" if hasattr(Task, "difficulty") else ("level" if hasattr(Task, "level") else None)
-    published = "published" if hasattr(Task, "published") else ("is_published" if hasattr(Task, "is_published") else None)
-    deadline_days = "deadline_days" if hasattr(Task, "deadline_days") else ("deadline" if hasattr(Task, "deadline") else None)
+    reward = (
+        "reward"
+        if hasattr(Task, "reward")
+        else ("coins" if hasattr(Task, "coins") else None)
+    )
+    difficulty = (
+        "difficulty"
+        if hasattr(Task, "difficulty")
+        else ("level" if hasattr(Task, "level") else None)
+    )
+    published = (
+        "published"
+        if hasattr(Task, "published")
+        else ("is_published" if hasattr(Task, "is_published") else None)
+    )
+    deadline_days = (
+        "deadline_days"
+        if hasattr(Task, "deadline_days")
+        else ("deadline" if hasattr(Task, "deadline") else None)
+    )
     created_at = "created_at" if hasattr(Task, "created_at") else None
     return {
         "title": title,
@@ -186,17 +203,26 @@ def _task_field_map() -> dict[str, str | None]:
     }
 
 
-def _create_task_obj(*, title: str, description: str, reward: int, difficulty: str, deadline_days: int) -> Task:
+def _create_task_obj(
+    *, title: str, description: str, reward: int, difficulty: str, deadline_days: int
+) -> Task:
     fm = _task_field_map()
     t = Task()  # ВАЖНО: без kwargs!
 
-    if fm["title"]:          setattr(t, fm["title"], title)
-    if fm["description"]:    setattr(t, fm["description"], description)
-    if fm["reward"]:         setattr(t, fm["reward"], reward)
-    if fm["difficulty"]:     setattr(t, fm["difficulty"], difficulty)
-    if fm["published"]:      setattr(t, fm["published"], False)
-    if fm["deadline_days"]:  setattr(t, fm["deadline_days"], deadline_days)
-    if fm["created_at"]:     setattr(t, fm["created_at"], datetime.utcnow())
+    if fm["title"]:
+        setattr(t, fm["title"], title)
+    if fm["description"]:
+        setattr(t, fm["description"], description)
+    if fm["reward"]:
+        setattr(t, fm["reward"], reward)
+    if fm["difficulty"]:
+        setattr(t, fm["difficulty"], difficulty)
+    if fm["published"]:
+        setattr(t, fm["published"], False)
+    if fm["deadline_days"]:
+        setattr(t, fm["deadline_days"], deadline_days)
+    if fm["created_at"]:
+        setattr(t, fm["created_at"], datetime.utcnow())
 
     return t
 
@@ -207,13 +233,32 @@ def seed_tasks_if_empty() -> None:
         if count > 0:
             return
         samples = [
-            dict(title="Репост события", description="Сделай репост анонса", reward=3, difficulty="easy",   deadline_days=2),
-            dict(title="Пост в блог",    description="Напиши короткий пост",  reward=8, difficulty="medium", deadline_days=3),
-            dict(title="Организуй митап",description="Подготовь офлайн-встречу", reward=13, difficulty="hard", deadline_days=7),
+            dict(
+                title="Репост события",
+                description="Сделай репост анонса",
+                reward=3,
+                difficulty="easy",
+                deadline_days=2,
+            ),
+            dict(
+                title="Пост в блог",
+                description="Напиши короткий пост",
+                reward=8,
+                difficulty="medium",
+                deadline_days=3,
+            ),
+            dict(
+                title="Организуй митап",
+                description="Подготовь офлайн-встречу",
+                reward=13,
+                difficulty="hard",
+                deadline_days=7,
+            ),
         ]
         for d in samples:
             s.add(_create_task_obj(**d))
         s.commit()
+
 
 def list_submitted_assignments(limit: int = 20) -> list[TaskAssignment]:
     """Все задания в статусе 'submitted' для админской модерации."""
@@ -232,6 +277,7 @@ def list_submitted_assignments(limit: int = 20) -> list[TaskAssignment]:
             _ = ta.user
         return items
 
+
 # калькулятор начисления баллов
 def calc_reward_for_task(task: Task | None) -> int:
     if task is None:
@@ -239,9 +285,8 @@ def calc_reward_for_task(task: Task | None) -> int:
     if getattr(task, "reward_coins", None) is not None:
         return int(task.reward_coins)
     # цена сложностей
-    diff_reward_map = {"easy":3, "medium":7, "hard":12}
+    diff_reward_map = {"easy": 3, "medium": 7, "hard": 12}
     return diff_reward_map(getattr(task, "difficulty", ""), 0)
-
 
 
 def moderate_assignment(assignment_id: int, approved: bool) -> int:
@@ -308,9 +353,13 @@ def moderate_assignment(assignment_id: int, approved: bool) -> int:
         return reward
 
 
-
-def list_tasks(*, min_reward: int | None = None, max_reward: int | None = None,
-               difficulty: str | None = None, only_published: bool = True):
+def list_tasks(
+    *,
+    min_reward: int | None = None,
+    max_reward: int | None = None,
+    difficulty: str | None = None,
+    only_published: bool = True,
+):
     fm = _task_field_map()
     with SessionLocal() as s:
         q = s.query(Task)
@@ -348,9 +397,11 @@ def list_public_tasks(difficulty: str | None = None) -> list[Task]:
 
         return q.all()
 
+
 def debug_all_tasks() -> list[Task]:
     with SessionLocal as s:
         return s.query(Task).order_by(Task.id.asc()).all()
+
 
 def get_task(task_id: int):
     with SessionLocal() as s:
@@ -366,23 +417,15 @@ def has_active_assignment(user_tg_id: int, task_id: int) -> bool:
     print(f"[DEBUG has_active_assignment] user_tg_id={user_tg_id}, task_id={task_id}")
 
     with SessionLocal() as s:
-        user = (
-            s.query(User)
-            .filter(User.tg_id == user_tg_id)
-            .first()
-        )
+        user = s.query(User).filter(User.tg_id == user_tg_id).first()
         if not user:
             print("[DEBUG has_active_assignment] user not found")
             return False
 
-
-        q = (
-            s.query(TaskAssignment)
-            .filter(
-                TaskAssignment.user_id == user.id,
-                TaskAssignment.task_id == task_id,
-                TaskAssignment.status.in_(("active", "submitted")),
-            )
+        q = s.query(TaskAssignment).filter(
+            TaskAssignment.user_id == user.id,
+            TaskAssignment.task_id == task_id,
+            TaskAssignment.status.in_(("active", "submitted")),
         )
 
         exists = s.query(q.exists()).scalar()
@@ -417,10 +460,9 @@ def take_task(user_tg_id: int, task_id: int) -> bool:
     """
     with SessionLocal() as s:
         # ищем / создаём пользователя
-        user = (
-            s.execute(select(User).where(User.tg_id == user_tg_id))
-            .scalar_one_or_none()
-        )
+        user = s.execute(
+            select(User).where(User.tg_id == user_tg_id)
+        ).scalar_one_or_none()
         if not user:
             user = User(tg_id=user_tg_id)
             s.add(user)
@@ -432,16 +474,13 @@ def take_task(user_tg_id: int, task_id: int) -> bool:
             return False
 
         # если есть активное/submitted назначение — не создаём ещё одно
-        exists = (
-            s.execute(
-                select(TaskAssignment).where(
-                    TaskAssignment.user_id == user.id,
-                    TaskAssignment.task_id == task_id,
-                    TaskAssignment.status.in_(("active", "submitted")),
-                )
+        exists = s.execute(
+            select(TaskAssignment).where(
+                TaskAssignment.user_id == user.id,
+                TaskAssignment.task_id == task_id,
+                TaskAssignment.status.in_(("active", "submitted")),
             )
-            .scalar_one_or_none()
-        )
+        ).scalar_one_or_none()
         if exists:
             return False
 
@@ -462,16 +501,35 @@ def take_task(user_tg_id: int, task_id: int) -> bool:
         return True
 
 
-
 def _task_field_map() -> dict[str, str | None]:
     """Вернём ВСЕ ключи, даже если столбца нет (значение = None)."""
-    title         = "title"        if hasattr(Task, "title")        else ("name" if hasattr(Task, "name") else None)
-    description   = "description"  if hasattr(Task, "description")  else None
-    reward        = "reward"       if hasattr(Task, "reward")       else ("coins" if hasattr(Task, "coins") else None)
-    difficulty    = "difficulty"   if hasattr(Task, "difficulty")   else ("level" if hasattr(Task, "level") else None)
-    published     = "published"    if hasattr(Task, "published")    else ("is_published" if hasattr(Task, "is_published") else None)
-    deadline_days = "deadline_days"if hasattr(Task, "deadline_days")else ("deadline" if hasattr(Task, "deadline") else None)
-    created_at    = "created_at"   if hasattr(Task, "created_at")   else None
+    title = (
+        "title"
+        if hasattr(Task, "title")
+        else ("name" if hasattr(Task, "name") else None)
+    )
+    description = "description" if hasattr(Task, "description") else None
+    reward = (
+        "reward"
+        if hasattr(Task, "reward")
+        else ("coins" if hasattr(Task, "coins") else None)
+    )
+    difficulty = (
+        "difficulty"
+        if hasattr(Task, "difficulty")
+        else ("level" if hasattr(Task, "level") else None)
+    )
+    published = (
+        "published"
+        if hasattr(Task, "published")
+        else ("is_published" if hasattr(Task, "is_published") else None)
+    )
+    deadline_days = (
+        "deadline_days"
+        if hasattr(Task, "deadline_days")
+        else ("deadline" if hasattr(Task, "deadline") else None)
+    )
+    created_at = "created_at" if hasattr(Task, "created_at") else None
     return {
         "title": title,
         "description": description,
@@ -483,30 +541,45 @@ def _task_field_map() -> dict[str, str | None]:
     }
 
 
-def _create_task_obj(*, title: str, description: str, reward: int, difficulty: str, deadline_days: int) -> Task:
+def _create_task_obj(
+    *, title: str, description: str, reward: int, difficulty: str, deadline_days: int
+) -> Task:
     fm = _task_field_map()
     t = Task()  # БЕЗ kwargs
 
-    title_f       = fm.get("title")
-    desc_f        = fm.get("description")
-    reward_f      = fm.get("reward")
-    diff_f        = fm.get("difficulty")
-    pub_f         = fm.get("published")
-    deadline_f    = fm.get("deadline_days")
-    created_at_f  = fm.get("created_at")
+    title_f = fm.get("title")
+    desc_f = fm.get("description")
+    reward_f = fm.get("reward")
+    diff_f = fm.get("difficulty")
+    pub_f = fm.get("published")
+    deadline_f = fm.get("deadline_days")
+    created_at_f = fm.get("created_at")
 
-    if title_f:      setattr(t, title_f, title)
-    if desc_f:       setattr(t, desc_f, description)
-    if reward_f:     setattr(t, reward_f, reward)
-    if diff_f:       setattr(t, diff_f, difficulty)
-    if pub_f:        setattr(t, pub_f, False)
-    if deadline_f:   setattr(t, deadline_f, deadline_days)
-    if created_at_f: setattr(t, created_at_f, datetime.utcnow())
+    if title_f:
+        setattr(t, title_f, title)
+    if desc_f:
+        setattr(t, desc_f, description)
+    if reward_f:
+        setattr(t, reward_f, reward)
+    if diff_f:
+        setattr(t, diff_f, difficulty)
+    if pub_f:
+        setattr(t, pub_f, False)
+    if deadline_f:
+        setattr(t, deadline_f, deadline_days)
+    if created_at_f:
+        setattr(t, created_at_f, datetime.utcnow())
 
     return t
 
-def list_tasks(*, min_reward: int | None = None, max_reward: int | None = None,
-               difficulty: str | None = None, only_published: bool = True) -> list[Task]:
+
+def list_tasks(
+    *,
+    min_reward: int | None = None,
+    max_reward: int | None = None,
+    difficulty: str | None = None,
+    only_published: bool = True,
+) -> list[Task]:
     fm = _task_field_map()
     with SessionLocal() as s:
         q = s.query(Task)
@@ -524,13 +597,18 @@ def list_tasks(*, min_reward: int | None = None, max_reward: int | None = None,
                 q = q.filter(getattr(Task, fm["reward"]) <= max_reward)
         return q.order_by(Task.id.desc()).all()
 
+
 def get_task(task_id: int) -> Task | None:
     with SessionLocal() as s:
         return s.query(Task).filter(Task.id == task_id).first()
 
+
 def _resolve_user(user_tg_id: int) -> User | None:
     with SessionLocal() as s:
-        return s.execute(select(User).where(User.tg_id == user_tg_id)).scalar_one_or_none()
+        return s.execute(
+            select(User).where(User.tg_id == user_tg_id)
+        ).scalar_one_or_none()
+
 
 def count_assignments_by_status(user_tg_id: int) -> dict[str, int]:
     """Вернёт агрегаты по группам статусов: active / submitted / done"""
@@ -538,9 +616,11 @@ def count_assignments_by_status(user_tg_id: int) -> dict[str, int]:
         user = _resolve_user(s, user_tg_id)
         if not user:
             return {"active": 0, "submitted": 0, "done": 0}
-        q = select(TaskAssignment.status, func.count(TaskAssignment.id))\
-            .where(TaskAssignment.user_id == user.id)\
+        q = (
+            select(TaskAssignment.status, func.count(TaskAssignment.id))
+            .where(TaskAssignment.user_id == user.id)
             .group_by(TaskAssignment.status)
+        )
         rows = s.execute(q).all()
         by_status = {st: cnt for st, cnt in rows}
         active = by_status.get("in_progress", 0)
@@ -572,13 +652,17 @@ def list_pending_submissions(page: int = 1, per_page: int = 10):
         )
         return list(s.execute(stmt).all())
 
+
 def get_assignment_full(assignment_id: int):
     """Вернёт assignment + связанные task/user."""
     with SessionLocal() as s:
-        a = s.query(TaskAssignment)\
-            .options(joinedload(TaskAssignment.task), joinedload(TaskAssignment.user))\
+        a = (
+            s.query(TaskAssignment)
+            .options(joinedload(TaskAssignment.task), joinedload(TaskAssignment.user))
             .get(assignment_id)
+        )
         return a
+
 
 def count_assignments_by_status(user_tg_id: int) -> dict[str, int]:
     """
@@ -590,7 +674,11 @@ def count_assignments_by_status(user_tg_id: int) -> dict[str, int]:
         if not u:
             return {"active": 0, "submitted": 0, "done": 0}
 
-        base = select(TaskAssignment.status, func.count()).where(TaskAssignment.user_id == u.id).group_by(TaskAssignment.status)
+        base = (
+            select(TaskAssignment.status, func.count())
+            .where(TaskAssignment.user_id == u.id)
+            .group_by(TaskAssignment.status)
+        )
         rows = s.execute(base).all()
         raw = {st: cnt for st, cnt in rows}
         active = raw.get("in_progress", 0)
@@ -598,7 +686,10 @@ def count_assignments_by_status(user_tg_id: int) -> dict[str, int]:
         done = raw.get("approved", 0) + raw.get("rejected", 0)
         return {"active": active, "submitted": submitted, "done": done}
 
-def list_assignments(user_tg_id: int, group: str, page: int = 1, per_page: int = 10, diff: str = "all"):
+
+def list_assignments(
+    user_tg_id: int, group: str, page: int = 1, per_page: int = 10, diff: str = "all"
+):
     """
     -> [(assignment_id, title, status, reward, due_at, submitted_at)]
     """
@@ -612,7 +703,9 @@ def list_assignments(user_tg_id: int, group: str, page: int = 1, per_page: int =
         elif group == "submitted":
             cond_group = TaskAssignment.status == "submitted"
         else:
-            cond_group = or_(TaskAssignment.status == "approved", TaskAssignment.status == "rejected")
+            cond_group = or_(
+                TaskAssignment.status == "approved", TaskAssignment.status == "rejected"
+            )
 
         stmt = (
             select(
@@ -644,6 +737,7 @@ def list_assignments(user_tg_id: int, group: str, page: int = 1, per_page: int =
                 TaskAssignment.submitted_at.desc().nullslast(),
                 TaskAssignment.id.desc(),
             )
+
 
 def moderate_assignment(assignment_id: int, approved: bool) -> bool:
     """
@@ -767,6 +861,7 @@ def get_assignment_card(assignment_id: int) -> str | None:
 
         return text
 
+
 def list_pending_assignments(limit: int = 20) -> list[dict]:
     """
     Вернуть последние N заданий в статусе 'submitted'
@@ -820,7 +915,9 @@ def get_assignment_for_moderation(assignment_id: int) -> dict | None:
         )
 
         if row is None:
-            log.warning("[get_assignment_for_moderation] not found id=%s", assignment_id)
+            log.warning(
+                "[get_assignment_for_moderation] not found id=%s", assignment_id
+            )
             return None
 
         assign, task, user = row
@@ -838,6 +935,7 @@ def get_assignment_for_moderation(assignment_id: int) -> dict | None:
             "submission_file_id": assign.submission_file_id,
             "reward": task.reward_coins or 0,
         }
+
 
 def approve_assignment(assignment_id: int) -> bool:
     """
@@ -959,9 +1057,7 @@ def submit_task(
 
     with SessionLocal() as session:
         # 1) юзер по tg_id
-        user = session.scalar(
-            select(User).where(User.tg_id == user_tg_id)
-        )
+        user = session.scalar(select(User).where(User.tg_id == user_tg_id))
         if not user:
             print(f"[submit_task] No user found with tg_id={user_tg_id}")
             return False
@@ -983,7 +1079,7 @@ def submit_task(
                 f"[submit_task] No active assignment for user_id={user.id}, task_id={task_id}"
             )
             return False
-        
+
         if assignment.status in ("approved", "rejected"):
             print(
                 f"[submit_task] Latest assignment {assignment.id} alredy final"
@@ -1036,6 +1132,7 @@ def list_submitted_assignments(limit: int = 20) -> list[TaskAssignment]:
 
         return items
 
+
 # Апрув/реджект модератором; при апруве — начисляем монеты
 def moderate_assignment(assignment_id: int, approve: bool) -> Optional[TaskAssignment]:
     with SessionLocal() as s:
@@ -1058,5 +1155,3 @@ def moderate_assignment(assignment_id: int, approve: bool) -> Optional[TaskAssig
         s.commit()
         s.refresh(a)
         return a
-
-

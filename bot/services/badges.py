@@ -12,11 +12,13 @@ BADGE_BY_LEVEL: dict[int, tuple[str, str]] = {
     9: ("Легенда", "🏆"),
 }
 
+
 @dataclass
 class Badge:
     level: int
     title: str
     icon: str
+
 
 def badges_for_coins(coins: int) -> list[Badge]:
     """Все полученные бейджи по текущим монетам (уровню)."""
@@ -27,17 +29,21 @@ def badges_for_coins(coins: int) -> list[Badge]:
             got.append(Badge(level=lvl, title=title, icon=icon))
     return got
 
+
 def newly_unlocked_badge(level_before: int, level_after: int) -> Badge | None:
     """Какой бейдж открылся при переходе уровня (если открылся)."""
     if level_after <= level_before:
         return None
     # ищем первый бейдж, чей порог пересекли
-    unlocked_levels = [lvl for lvl in BADGE_BY_LEVEL.keys() if level_before < lvl <= level_after]
+    unlocked_levels = [
+        lvl for lvl in BADGE_BY_LEVEL.keys() if level_before < lvl <= level_after
+    ]
     if not unlocked_levels:
         return None
     lvl = min(unlocked_levels)
     title, icon = BADGE_BY_LEVEL[lvl]
     return Badge(level=lvl, title=title, icon=icon)
+
 
 def render_badges_line(coins: int) -> str:
     """Короткая строка для профиля."""

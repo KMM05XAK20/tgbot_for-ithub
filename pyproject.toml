@@ -14,3 +14,22 @@ dev = [
 pythonpath = ["."]
 testpaths = ["tests"]
 asyncio_mode = "strict"
+
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = [
+  "E", "F",   # базовые ошибки/flake8
+  "I",        # сортировка импортов
+  "B",        # bugbear (частые баги)
+  "UP",       # pyupgrade
+]
+ignore = [
+  "E501",     # длина строки (лучше отдать форматтеру)
+]
+
+[tool.ruff.format]
+quote-style = "double"

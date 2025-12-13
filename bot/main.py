@@ -9,7 +9,6 @@ from aiogram.enums import ParseMode
 from .routers import root_router
 from .config import get_settings
 from .command import setup_bot_commands
-from .storage.models import User
 
 logging.basicConfig(level=logging.DEBUG)
 
