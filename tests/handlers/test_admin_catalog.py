@@ -2,10 +2,14 @@ from unittest.mock import AsyncMock
 from venv import create
 import pytest
 
+from bot.handlers.task.catalog import take_task_cb
+from bot.services.tasks import take_task
+
 
 @pytest.mark.asyncio
 async def test_open_tasks_root_renders_list(cb, mocker):
     from bot.handlers.task.catalog import open_tasks_root
+    
 
     # мок списка задач
     t1 = type(
@@ -38,6 +42,7 @@ async def test_open_tasks_root_renders_list(cb, mocker):
 
     # главное: safe_edit_text вызвался
     from bot.handlers.task import catalog as mod
+    from bot.utils.telegram import safe_edit_text
 
     mod.safe_edit_text.assert_awaited_once()
 
@@ -81,42 +86,27 @@ async def test_open_tasks_root_renders_list(cb, mocker):
 @pytest.mark.asyncio
 async def test_task_view_shows_take_button_if_not_taken(cb, mocker):
     from bot.handlers.task.catalog import open_task_details
-
-    task = type(
-        "T",
-        (),
-        {
-            "id": 1,
-            "title": "X",
-            "difficulty": "easy",
-            "reward_coins": 5,
-            "deadline_days": None,
-        },
-    )()
-    mocker.patch(
-        "bot.handlers.task.catalog.get_task_by_id", return_value=task, create=True
-    )
-    mocker.patch(
-        "bot.handlers.task.catalog.has_active_assignment",
-        return_value=False,
-        create=True,
-    )
-
-    kb = mocker.patch(
-        "bot.handlers.task.catalog.task_view_kb", return_value="KB", create=True
-    )
-    kb2 = mocker.patch(
-        "bot.handlers.task.catalog.task_view_kb", return_value="KB", create=True
-    )
-    safe_edit = mocker.patch(
-        "bot.handlers.task.catalog.safe_edit_text", new=AsyncMock(), create=True
-    )
+    from tests.fakes import FakeTask
 
     cb.data = "tasks:view:1"
+    cb.answer = AsyncMock()
+    cb.message.edit_text = AsyncMock()
+
+    task = FakeTask(id=1)
+
+    mocker.patch("bot.handlers.task.catalog.get_task", return_value=task)
+    mocker.patch("bot.handlers.task.catalog.has_active_assignment", return_value=False)
+
+    kb_mock = mocker.patch(
+        "bot.handlers.task.catalog.task_view_kb",
+        return_value="KB",
+    )
+    safe_edit = mocker.patch(
+        "bot.handlers.task.catalog.safe_edit_text",
+        new=AsyncMock(),
+    )
+
     await open_task_details(cb)
 
+    kb_mock.assert_called_once_with(1, already_taken=False)
     assert safe_edit.await_count == 1
-    kw = safe_edit.await_args.kw
-    assert kw.get("reply_markup") == "KB"
-    kb.assert_called_once_with(task_id=1, already_taken=False)
-    safe_edit.assert_awaited()

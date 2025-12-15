@@ -12,6 +12,6 @@ async def test_admin_entry_shows_panel(msg, mocker):
 
     await admin_entry(msg)
     msg.answer.assert_awaited_once()
-    args, kwargs = msg.message.answer.call_args
+    args, kwargs = msg.answer.call_args
     assert "Админ-панель" in args[0]
     assert kwargs["reply_markup"] == "KB"
